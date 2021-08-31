@@ -20,12 +20,14 @@ EOL
 )
 
     log "querying manifest service at $BASE_URL/manifests/"
-    MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -r .manifests[0])
-    if [[ "$MANIFESTS" = null ]]; then
+    MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c .manifests[0])
+    while [ -z "$MANIFESTS" ]; do
         log "Unable to get manifests from '$BASE_URL/manifests/'"
         log $MANIFESTS
-        exit 1
-    fi
+        log "sleeping for 15 seconds before trying again.."
+        sleep 15
+        MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c .manifests[0])
+    done
     FILENAME=$(echo "${MANIFESTS}" | jq -r .filename)
     MANIFEST=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/file/$FILENAME" 2>/dev/null | jq -r .)
     echo "${MANIFEST}" > /data/manifest.json
