@@ -21,7 +21,6 @@ EOL
 
     log "querying manifest service at $BASE_URL/manifests/"
     MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c .manifests[0])
-    log "Manifests: $MANIFESTS"
     while [ -z "$MANIFESTS" ]; do
         log "Unable to get manifests from '$BASE_URL/manifests/'"
         log $MANIFESTS
