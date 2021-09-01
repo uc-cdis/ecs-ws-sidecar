@@ -40,6 +40,26 @@ EOL
     log "Finished populating placeholder files"
 }
 
+function apikeyfile() {
+    if [[ ! -d "/gen3" ]]; then
+        log "Please mount shared docker volume under /gen3. Gen3 SDK will not be configured correctly.."
+        mkdir /gen3
+    fi
+    if [[ -z $API_KEY || -z $API_KEY_ID ]]; then
+        log '$API_KEY or $API_KEY_ID not set. Skipping writing api key to file. WARNING: Gen3 SDK will not be configured correctly.'
+        exit 5
+    else 
+        log "Writing apiKey to ~/.gen3/credentials.json"
+        apikey=$(jq --arg key0   'api_key' \
+            --arg value0 "${API_KEY}" \
+            --arg key1   'key_id' \
+            --arg value1 "${API_KEY_ID}" \
+            '. | .[$key0]=$value0 | .[$key1]=$value1'  \
+            <<<'{}')
+        echo "$apikey" > /gen3/credentials.json
+    fi
+}
+
 function main() {
     if [[ -z "${BASE_URL}" ]]; then
         echo "No base url set"
@@ -48,11 +68,13 @@ function main() {
         echo "No access token set"
         exit 2
     fi
-    if [[ ! -f "/data/${BASE_URL}" ]]; then 
+    if [[ ! -d "/data/${BASE_URL}" ]]; then 
+        log "Creating /data/$BASE_URL/ directory"
         mkdir "/data/${BASE_URL}/"
     fi
     log "Trying to populate data from MDS..."
     
+    apikeyfile
     populate
 
 }
