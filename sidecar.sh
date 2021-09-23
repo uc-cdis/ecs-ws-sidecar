@@ -78,6 +78,9 @@ function main() {
         exit 1
     fi
 
+    log "Setting up $GEN3_ENDPOINT"
+    export GEN3_ENDPOINT=${BASE_URL}
+
     # Gen3SDK should work if $GEN3_API_KEY is set
     apikeyfile
     get_access_token
