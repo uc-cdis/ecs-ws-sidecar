@@ -32,15 +32,15 @@ function populate() {
             if [[ -n "${FILE_NAME}" ]]; then
                 # if file name exist, use it
                 touch "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
             else
                 # otherwise, name it using object ID
                 touch "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES!\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI.\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
             fi
         else
             log "No object ID found for manifest entry, skipping..."
