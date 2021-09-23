@@ -33,13 +33,13 @@ function populate() {
                 # if file name exist, use it
                 touch "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
                 echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Please run \"gen3 --auth ~/.gen3/credentials.json pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
                 echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
             else
                 # otherwise, name it using object ID
                 touch "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
                 echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES!\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Please run \"gen3 --auth ~/.gen3/credentials.json pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI.\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI.\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
                 echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
             fi
         else
@@ -54,13 +54,13 @@ function apikeyfile() {
         log "Please mount shared docker volume under /.gen3. Gen3 SDK will not be configured correctly.."
         mkdir /.gen3
     fi
-    if [[ -z $GEN3_API_KEY ]]; then
-        log '$GEN3_API_KEY not set. Skipping writing api key to file. WARNING: Gen3 SDK will not be configured correctly.'
+    if [[ -z $API_KEY ]]; then
+        log '$API_KEY not set. Skipping writing api key to file. WARNING: Gen3 SDK will not be configured correctly.'
         exit 5
     else
         log "Writing apiKey to ~/.gen3/credentials.json"
         apikey=$(jq --arg key0   'api_key' \
-            --arg value0 "${GEN3_API_KEY}" \
+            --arg value0 "${API_KEY}" \
             '. | .[$key0]=$value0 '  \
             <<<'{}')
         echo "$apikey" > /.gen3/credentials.json
@@ -69,7 +69,7 @@ function apikeyfile() {
 
 function get_access_token() {
     log "Getting access token using mounted API key from https://$BASE_URL/user/"
-    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ \"api_key\": \"${GEN3_API_KEY}\" }" 2>/dev/null | jq -r .access_token)
+    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" 2>/dev/null | jq -r .access_token)
 }
 
 function main() {
@@ -81,7 +81,7 @@ function main() {
     log "Setting up $GEN3_ENDPOINT"
     export GEN3_ENDPOINT=${BASE_URL}
 
-    # Gen3SDK should work if $GEN3_API_KEY is set
+    # Gen3SDK should work if $API_KEY is set
     apikeyfile
     get_access_token
 
@@ -95,10 +95,7 @@ function main() {
         mkdir "/data/${BASE_URL}/"
     fi
     log "Trying to populate data from MDS..."
-
-
     populate
-
 }
 
 
