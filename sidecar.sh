@@ -27,10 +27,24 @@ function populate() {
         # C_URL=$( echo $i | jq -r .commons_url )
         FILE_NAME=$( echo $i | jq -r .file_name )
         OBJECT_ID=$( echo $i | jq -r .object_id )
-        touch "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-        echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES!\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-        echo "Please run \"gen3 --endpoint ${BASE_URL} pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI.\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-        echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+        # only care if there is an object ID
+        if [[ -z "${OBJECT_ID}" ]]; then
+            if [[ -z "${FILE_NAME}" ]]; then
+                # if file name exist, use it
+                touch "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES!\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo "Please run \"gen3 --endpoint ${BASE_URL} pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI.\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+            else
+                # otherwise, name it using object ID
+                touch "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES!\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "Please run \"gen3 --endpoint ${BASE_URL} pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI.\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+            fi
+        else
+            log "No object ID found for manifest entry, skipping..."
+        fi
     done
     log "Finished populating placeholder files"
 }
