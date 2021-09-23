@@ -54,13 +54,13 @@ function apikeyfile() {
 }
 
 function get_access_token() {
-    log "Getting access token using mounted API key from $BASE_URL/user/"
-    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ "api_key": "${GEN3_API_KEY}" }" 2>/dev/null | jq -c .manifests[0])
+    log "Getting access token using mounted API key from https://$BASE_URL/user/"
+    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ "api_key": "${GEN3_API_KEY}" }" 2>/dev/null | jq -c .access_token)
 }
 
 function main() {
     if [[ -z "${BASE_URL}" ]]; then
-        echo "No base url set"
+        log "No base url set"
         exit 1
     fi
 
@@ -69,7 +69,7 @@ function main() {
     get_access_token
 
     if [[ -z "${ACCESS_TOKEN}" ]]; then
-        echo "No access token set"
+        log "No access token set"
         exit 2
     fi
 
