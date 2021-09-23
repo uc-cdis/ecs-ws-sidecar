@@ -55,7 +55,7 @@ function apikeyfile() {
 
 function get_access_token() {
     log "Getting access token using mounted API key from https://$BASE_URL/user/"
-    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ "api_key": "${GEN3_API_KEY}" }" 2>/dev/null | jq -c .access_token)
+    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ \"api_key\": \"${GEN3_API_KEY}\" }" 2>/dev/null | jq -c .access_token)
 }
 
 function main() {
