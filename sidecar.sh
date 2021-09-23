@@ -50,9 +50,9 @@ function populate() {
 }
 
 function apikeyfile() {
-    if [[ ! -d "/gen3" ]]; then
-        log "Please mount shared docker volume under /gen3. Gen3 SDK will not be configured correctly.."
-        mkdir /gen3
+    if [[ ! -d "~/.gen3" ]]; then
+        log "Please mount shared docker volume under ~/.gen3. Gen3 SDK will not be configured correctly.."
+        mkdir ~/.gen3
     fi
     if [[ -z $GEN3_API_KEY ]]; then
         log '$GEN3_API_KEY not set. Skipping writing api key to file. WARNING: Gen3 SDK will not be configured correctly.'
@@ -63,7 +63,7 @@ function apikeyfile() {
             --arg value0 "${GEN3_API_KEY}" \
             '. | .[$key0]=$value0 '  \
             <<<'{}')
-        echo "$apikey" > /gen3/credentials.json
+        echo "$apikey" > ~/.gen3/credentials.json
     fi
 }
 
