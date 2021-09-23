@@ -11,13 +11,13 @@ function log(){
 
 function populate() {
     log "querying manifest service at $BASE_URL/manifests/"
-    MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c .manifests[0])
+    MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
     while [ -z "$MANIFESTS" ]; do
         log "Unable to get manifests from '$BASE_URL/manifests/'"
         log $MANIFESTS
         log "sleeping for 15 seconds before trying again.."
         sleep 15
-        MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c .manifests[0])
+        MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
     done
     FILENAME=$(echo "${MANIFESTS}" | jq -r .filename)
     MANIFEST=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/file/$FILENAME" 2>/dev/null | jq -r .)
@@ -69,7 +69,7 @@ function apikeyfile() {
 
 function get_access_token() {
     log "Getting access token using mounted API key from https://$BASE_URL/user/"
-    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ \"api_key\": \"${GEN3_API_KEY}\" }" 2>/dev/null | jq -c .access_token)
+    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ \"api_key\": \"${GEN3_API_KEY}\" }" 2>/dev/null | jq -r .access_token)
 }
 
 function main() {
