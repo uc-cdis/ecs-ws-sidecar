@@ -28,8 +28,8 @@ function populate() {
         FILE_NAME=$( echo $i | jq -r .file_name )
         OBJECT_ID=$( echo $i | jq -r .object_id )
         # only care if there is an object ID
-        if [[ -z "${OBJECT_ID}" ]]; then
-            if [[ -z "${FILE_NAME}" ]]; then
+        if [[ -n ${OBJECT_ID} ]]; then
+            if [[ -n "${FILE_NAME}" ]]; then
                 # if file name exist, use it
                 touch "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
                 echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES!\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
