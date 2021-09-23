@@ -10,17 +10,17 @@ function log(){
 
 
 function populate() {
-    log "querying manifest service at $BASE_URL/manifests/"
-    MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
+    log "querying manifest service at $GEN3_ENDPOINT/manifests/"
+    MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
     while [ -z "$MANIFESTS" ]; do
-        log "Unable to get manifests from '$BASE_URL/manifests/'"
+        log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
         log $MANIFESTS
         log "sleeping for 15 seconds before trying again.."
         sleep 15
-        MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
+        MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
     done
     FILENAME=$(echo "${MANIFESTS}" | jq -r .filename)
-    MANIFEST=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$BASE_URL/manifests/file/$FILENAME" 2>/dev/null | jq -r .)
+    MANIFEST=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME" 2>/dev/null | jq -r .)
     echo "${MANIFEST}" > /data/manifest.json
     log "Populating placefolder files..."
     jq -c '.[]' /data/manifest.json | while read i; do
@@ -31,16 +31,16 @@ function populate() {
         if [[ -n "${OBJECT_ID}" ]]; then
             if [[ -n "${FILE_NAME}" ]]; then
                 # if file name exist, use it
-                touch "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${BASE_URL}/${FILE_NAME}_PLACEHOLDER.txt"
+                touch "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
             else
                 # otherwise, name it using object ID
-                touch "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${BASE_URL}/${OBJECT_ID}_PLACEHOLDER.txt"
+                touch "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
             fi
         else
             log "No object ID found for manifest entry, skipping..."
@@ -68,18 +68,15 @@ function apikeyfile() {
 }
 
 function get_access_token() {
-    log "Getting access token using mounted API key from https://$BASE_URL/user/"
-    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$BASE_URL/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" 2>/dev/null | jq -r .access_token)
+    log "Getting access token using mounted API key from https://$GEN3_ENDPOINT/user/"
+    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" 2>/dev/null | jq -r .access_token)
 }
 
 function main() {
-    if [[ -z "${BASE_URL}" ]]; then
+    if [[ -z "${GEN3_ENDPOINT}" ]]; then
         log "No base url set"
         exit 1
     fi
-
-    log "Setting up GEN3_ENDPOINT"
-    export GEN3_ENDPOINT=$BASE_URL
 
     # Gen3SDK should work if $API_KEY is set
     apikeyfile
@@ -90,9 +87,9 @@ function main() {
         exit 2
     fi
 
-    if [[ ! -d "/data/${BASE_URL}" ]]; then
-        log "Creating /data/$BASE_URL/ directory"
-        mkdir "/data/${BASE_URL}/"
+    if [[ ! -d "/data/${GEN3_ENDPOINT}" ]]; then
+        log "Creating /data/$GEN3_ENDPOINT/ directory"
+        mkdir "/data/${GEN3_ENDPOINT}/"
     fi
     log "Trying to populate data from MDS..."
     populate
