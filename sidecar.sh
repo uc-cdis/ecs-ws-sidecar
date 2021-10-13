@@ -21,9 +21,9 @@ function populate() {
     done
     FILENAME=$(echo "${MANIFESTS}" | jq -r .filename)
     MANIFEST=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME" 2>/dev/null | jq -r .)
-    echo "${MANIFEST}" > /data/manifest.json
+    echo "${MANIFEST}" > /data/${FILENAME}.json
     log "Populating placefolder files..."
-    jq -c '.[]' /data/manifest.json | while read i; do
+    jq -c '.[]' /data/${FILENAME}.json | while read i; do
         # C_URL=$( echo $i | jq -r .commons_url )
         FILE_NAME=$( echo $i | jq -r .file_name )
         OBJECT_ID=$( echo $i | jq -r .object_id )
@@ -47,10 +47,7 @@ function populate() {
         fi
     done
     log "Finished populating placeholder files"
-    while true; do
-        # Sleeping forever so EKS will be happy
-        sleep 10000
-    done
+
 }
 
 function apikeyfile() {
@@ -97,6 +94,12 @@ function main() {
     fi
     log "Trying to populate data from MDS..."
     populate
+     while true; do
+        # Sleeping for 30 seconds while checking for new manifests.
+        log "Checking for new manifests."
+        populate
+        sleep 30
+    done
 }
 
 
