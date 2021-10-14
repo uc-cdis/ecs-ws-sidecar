@@ -1,3 +1,8 @@
+# Only the most recent manifest is mounted.
+# If new manifests are added while the workspace is running,
+# only keep the N latest manifests
+MAX_MANIFESTS=5
+
 function log(){
     LOGFILE="/data/populate_log.txt"
     if [[ ! -f ${LOGFILE} ]]; then
@@ -19,35 +24,50 @@ function populate() {
         sleep 15
         MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
     done
-    FILENAME=$(echo "${MANIFESTS}" | jq -r .filename)
-    MANIFEST=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME" 2>/dev/null | jq -r .)
-    echo "${MANIFEST}" > /data/${FILENAME}.json
-    log "Populating placefolder files..."
-    jq -c '.[]' /data/${FILENAME}.json | while read i; do
-        # C_URL=$( echo $i | jq -r .commons_url )
-        FILE_NAME=$( echo $i | jq -r .file_name )
-        OBJECT_ID=$( echo $i | jq -r .object_id )
-        # only care if there is an object ID
-        if [[ -n "${OBJECT_ID}" ]]; then
-            if [[ -n "${FILE_NAME}" ]]; then
-                # if file name exist, use it
-                touch "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+    MANIFEST_NAME=$(echo "${MANIFESTS}" | jq -r .filename)
+    MOUNT_NAME=$(sed 's/\.[^.]*$//' <<< $MANIFEST_NAME)
+    if [ ! -d "/data/${MOUNT_NAME}" ]; then
+        mkdir /data/${MOUNT_NAME}
+        MANIFEST_CONTENT=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$MANIFEST_NAME" 2>/dev/null | jq -r .)
+        echo "${MANIFEST_CONTENT}" > /data/${MOUNT_NAME}/${MANIFEST_NAME}.json
+        log "Populating placefolder files for ${MANIFEST_NAME}..."
+        COUNT=0
+        jq -c '.[]' /data/${MOUNT_NAME}/${MANIFEST_NAME}.json | while [[ read i && COUNT -lt $MAX_MANIFESTS ]]; do
+            # C_URL=$( echo $i | jq -r .commons_url )
+            FILE_NAME=$( echo $i | jq -r .file_name )
+            OBJECT_ID=$( echo $i | jq -r .object_id )
+            # only care if there is an object ID
+            if [[ -n "${OBJECT_ID}" ]]; then
+                if [[ -n "${FILE_NAME}" ]]; then
+                    # if file name exist, use it
+                    touch "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                    echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                    echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                    echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                else
+                    # otherwise, name it using object ID
+                    touch "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                    echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                    echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                    echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                fi
+                COUNT=$((COUNT+1))
             else
-                # otherwise, name it using object ID
-                touch "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                log "No object ID found for manifest entry, skipping..."
             fi
-        else
-            log "No object ID found for manifest entry, skipping..."
-        fi
+    fi
     done
     log "Finished populating placeholder files"
+}
 
+function clean_up_old_mounts() {
+    # get the number of existing mounted manifests. If there are more than
+    # MAX_MANIFESTS, delete the oldest until it become less.
+    while [ $(ls -ldrt /data/manifest*/ | wc -l) -gt $MAX_MANIFESTS ]; do
+        OLDDIR=$(ls -ldrt manifest*/ | grep manifest | cut -d ' ' -f 9 | head -n 1)
+        log "Unmount old manifest $OLDDIR"
+        rm -rf $OLDDIR
+    done
 }
 
 function apikeyfile() {
@@ -94,10 +114,13 @@ function main() {
     fi
     log "Trying to populate data from MDS..."
     populate
+    clean_up_old_mounts
+    sleep 30
      while true; do
         # Sleeping for 30 seconds while checking for new manifests.
         log "Checking for new manifests."
         populate
+        clean_up_old_mounts
         sleep 30
     done
 }
