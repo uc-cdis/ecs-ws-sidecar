@@ -24,47 +24,50 @@ function populate() {
         sleep 15
         MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
     done
-    MANIFEST_NAME=$(echo "${MANIFESTS}" | jq -r .filename)
-    MOUNT_NAME=$(sed 's/\.[^.]*$//' <<< $MANIFEST_NAME)
-    if [ ! -d "/data/${MOUNT_NAME}" ]; then
-        mkdir /data/${MOUNT_NAME}
-        MANIFEST_CONTENT=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$MANIFEST_NAME" 2>/dev/null | jq -r .)
-        echo "${MANIFEST_CONTENT}" > /data/${MOUNT_NAME}/${MANIFEST_NAME}
-        if [[ ! -d "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}" ]]; then
-            log "Creating /data/${MOUNT_NAME}/$GEN3_ENDPOINT/ directory"
-            mkdir "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/"
+
+    COUNT=0
+    curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests" | while read i; do
+        if [[ $COUNT -gt $MAX_MANIFESTS ]]; then
+            break
         fi
-        log "Populating placefolder files for ${MANIFEST_NAME}..."
-        COUNT=0
-        jq -c '.[]' /data/${MOUNT_NAME}/${MANIFEST_NAME}.json | while read i; do
-            if [[ $COUNT -gt $MAX_MANIFESTS ]]; then
-                break
+        MANIFEST_NAME=$( echo $i | jq -r .filename )
+        MOUNT_NAME=$(sed 's/\.[^.]*$//' <<< $MANIFEST_NAME)
+        if [ ! -d "/data/${MOUNT_NAME}" ]; then
+            mkdir /data/${MOUNT_NAME}
+            MANIFEST_CONTENT=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$MANIFEST_NAME" 2>/dev/null | jq -r .)
+            echo "${MANIFEST_CONTENT}" > /data/${MOUNT_NAME}/${MANIFEST_NAME}
+            if [[ ! -d "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}" ]]; then
+                log "Creating /data/${MOUNT_NAME}/$GEN3_ENDPOINT/ directory"
+                mkdir "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/"
             fi
-            # C_URL=$( echo $i | jq -r .commons_url )
-            FILE_NAME=$( echo $i | jq -r .file_name )
-            OBJECT_ID=$( echo $i | jq -r .object_id )
-            # only care if there is an object ID
-            if [[ -n "${OBJECT_ID}" ]]; then
-                if [[ -n "${FILE_NAME}" ]]; then
-                    # if file name exist, use it
-                    touch "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                    echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                    echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                    echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+            log "Populating placefolder files for ${MANIFEST_NAME}..."
+            jq -c '.[]' /data/${MOUNT_NAME}/${MANIFEST_NAME}.json | while read j; do
+                # C_URL=$( echo $j | jq -r .commons_url )
+                FILE_NAME=$( echo $j | jq -r .file_name )
+                OBJECT_ID=$( echo $j | jq -r .object_id )
+                # only care if there is an object ID
+                if [[ -n "${OBJECT_ID}" ]]; then
+                    if [[ -n "${FILE_NAME}" ]]; then
+                        # if file name exist, use it
+                        touch "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                        echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                        echo -en "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                        echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
+                    else
+                        # otherwise, name it using object ID
+                        touch "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                        echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                        echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                        echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                    fi
                 else
-                    # otherwise, name it using object ID
-                    touch "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                    echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                    echo "Please run \"gen3 pull_object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                    echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
+                    log "No object ID found for manifest entry, skipping..."
                 fi
-                COUNT=$((COUNT+1))
-            else
-                log "No object ID found for manifest entry, skipping..."
-            fi
-        done
-    fi
-    log "Finished populating placeholder files"
+            done
+        fi
+        COUNT=$((COUNT+1))
+        log "Finished populating placeholder files for ${MANIFEST_NAME}"
+    done
 }
 
 function clean_up_old_mounts() {
