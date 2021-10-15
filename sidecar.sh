@@ -26,7 +26,7 @@ function populate() {
     done
 
     COUNT=0
-    curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | .[]" | while read i; do
+    curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | reverse | .[]" | while read i; do
         if [[ $COUNT -ge $MAX_MANIFESTS ]]; then
             break
         fi
@@ -74,7 +74,6 @@ function clean_up_old_mounts() {
     # get the number of existing mounted manifests. If there are more than
     # MAX_MANIFESTS, delete the oldest until it become less.
     while [ $(ls -ldrt /data/manifest*/ | wc -l) -gt $MAX_MANIFESTS ]; do
-
         OLDDIR=$(find . -type d -name "manifest*" -printf '%T+ %p\n' | sort | head -n 1 | cut -d ' '-f 2)
         log "Unmount old manifest $OLDDIR"
         rm -rf $OLDDIR
