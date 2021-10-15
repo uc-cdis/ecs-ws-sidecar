@@ -30,9 +30,16 @@ function populate() {
         mkdir /data/${MOUNT_NAME}
         MANIFEST_CONTENT=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$MANIFEST_NAME" 2>/dev/null | jq -r .)
         echo "${MANIFEST_CONTENT}" > /data/${MOUNT_NAME}/${MANIFEST_NAME}.json
+        if [[ ! -d "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}" ]]; then
+            log "Creating /data/${MOUNT_NAME}/$GEN3_ENDPOINT/ directory"
+            mkdir "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/"
+        fi
         log "Populating placefolder files for ${MANIFEST_NAME}..."
         COUNT=0
-        jq -c '.[]' /data/${MOUNT_NAME}/${MANIFEST_NAME}.json | while [[ read i && COUNT -lt $MAX_MANIFESTS ]]; do
+        jq -c '.[]' /data/${MOUNT_NAME}/${MANIFEST_NAME}.json | while read i; do
+            if [[ $COUNT -gt $MAX_MANIFESTS ]]; then
+                break
+            fi
             # C_URL=$( echo $i | jq -r .commons_url )
             FILE_NAME=$( echo $i | jq -r .file_name )
             OBJECT_ID=$( echo $i | jq -r .object_id )
@@ -55,8 +62,8 @@ function populate() {
             else
                 log "No object ID found for manifest entry, skipping..."
             fi
+        done
     fi
-    done
     log "Finished populating placeholder files"
 }
 
@@ -108,10 +115,6 @@ function main() {
         exit 2
     fi
 
-    if [[ ! -d "/data/${GEN3_ENDPOINT}" ]]; then
-        log "Creating /data/$GEN3_ENDPOINT/ directory"
-        mkdir "/data/${GEN3_ENDPOINT}/"
-    fi
     log "Trying to populate data from MDS..."
     populate
     clean_up_old_mounts
