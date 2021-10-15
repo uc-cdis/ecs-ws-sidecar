@@ -29,7 +29,7 @@ function populate() {
     if [ ! -d "/data/${MOUNT_NAME}" ]; then
         mkdir /data/${MOUNT_NAME}
         MANIFEST_CONTENT=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$MANIFEST_NAME" 2>/dev/null | jq -r .)
-        echo "${MANIFEST_CONTENT}" > /data/${MOUNT_NAME}/${MANIFEST_NAME}.json
+        echo "${MANIFEST_CONTENT}" > /data/${MOUNT_NAME}/${MANIFEST_NAME}
         if [[ ! -d "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}" ]]; then
             log "Creating /data/${MOUNT_NAME}/$GEN3_ENDPOINT/ directory"
             mkdir "/data/${MOUNT_NAME}/${GEN3_ENDPOINT}/"
