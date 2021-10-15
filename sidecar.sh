@@ -26,7 +26,7 @@ function populate() {
     done
 
     COUNT=0
-    curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests" | while read i; do
+    curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | .[]" | while read i; do
         if [[ $COUNT -gt $MAX_MANIFESTS ]]; then
             break
         fi
