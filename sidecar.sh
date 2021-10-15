@@ -74,7 +74,7 @@ function clean_up_old_mounts() {
     # get the number of existing mounted manifests. If there are more than
     # MAX_MANIFESTS, delete the oldest until it become less.
     while [ $(ls -ldrt /data/manifest*/ | wc -l) -gt $MAX_MANIFESTS ]; do
-        OLDDIR=$(ls -ldrt manifest*/ | grep manifest | cut -d ' ' -f 9 | head -n 1)
+        OLDDIR=$(ls -ldrt /data/manifest*/ | grep manifest | cut -d ' ' -f 9 | head -n 1)
         log "Unmount old manifest $OLDDIR"
         rm -rf $OLDDIR
     done
