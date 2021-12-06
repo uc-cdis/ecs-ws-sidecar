@@ -1,6 +1,8 @@
 FROM cfmanteiga/alpine-bash-curl-jq:latest
 
-USER root 
+USER root
+
+RUN apk add libssl-dev
 
 WORKDIR /scripts
 
