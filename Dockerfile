@@ -1,8 +1,9 @@
-FROM cfmanteiga/alpine-bash-curl-jq:latest
+FROM alpine:latest
 
 USER root
 
-RUN apk add libssl-dev
+RUN apk update &&\
+    apk add --no-cache curl jq bash
 
 WORKDIR /scripts
 
