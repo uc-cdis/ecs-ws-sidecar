@@ -1,6 +1,9 @@
-FROM cfmanteiga/alpine-bash-curl-jq:latest
+FROM alpine:latest
 
-USER root 
+USER root
+
+RUN apk update && \
+    apk add --no-cache curl jq bash
 
 WORKDIR /scripts
 
