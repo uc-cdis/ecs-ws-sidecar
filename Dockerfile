@@ -2,7 +2,7 @@ FROM alpine:latest
 
 USER root
 
-RUN apk update &&\
+RUN apk update && \
     apk add --no-cache curl jq bash
 
 WORKDIR /scripts
