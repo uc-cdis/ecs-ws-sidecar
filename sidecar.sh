@@ -47,6 +47,10 @@ function populate() {
         fi
     done
     log "Finished populating placeholder files"
+    while true; do
+        # Sleeping forever so EKS will be happy
+        sleep 10000
+    done
 }
 
 function apikeyfile() {
