@@ -60,7 +60,6 @@ function apikeyfile() {
     fi
     if [[ -z $API_KEY ]]; then
         log '$API_KEY not set. Skipping writing api key to file. WARNING: Gen3 SDK will not be configured correctly.'
-        exit 5
     else
         log "Writing apiKey to ~/.gen3/credentials.json"
         apikey=$(jq --arg key0   'api_key' \
@@ -73,7 +72,14 @@ function apikeyfile() {
 
 function get_access_token() {
     log "Getting access token using mounted API key from https://$GEN3_ENDPOINT/user/"
-    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" 2>/dev/null | jq -r .access_token)
+    ACCESS_TOKEN=$(curl -s -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" | jq -r .access_token)
+    while [ -z "$ACCESS_TOKEN" ]; do
+        log "Unable to get ACCESS TOKEN using API key."
+        log "sleeping for 15 seconds before trying again.."
+        sleep 15
+        ACCESS_TOKEN=$(curl -s -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" | jq -r .access_token)
+    done
+    export ACCESS_TOKEN="$ACCESS_TOKEN"
 }
 
 function main() {
@@ -85,11 +91,6 @@ function main() {
     # Gen3SDK should work if $API_KEY is set
     apikeyfile
     get_access_token
-
-    if [[ -z "${ACCESS_TOKEN}" ]]; then
-        log "No access token set"
-        exit 2
-    fi
 
     if [[ ! -d "/data/${GEN3_ENDPOINT}" ]]; then
         log "Creating /data/$GEN3_ENDPOINT/ directory"
