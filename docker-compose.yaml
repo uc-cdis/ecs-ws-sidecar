@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  sidecar:
+    image: quay.io/cdis/ecs-ws-sidecar:local
+    environment:
+      GEN3_ENDPOINT: XX
+      API_KEY: XX # pragma: allowlist secret
+    volumes:
+      - ./data:/data
+      - ./gen3:/.gen3
+      - ./sidecar.sh:/scripts/sidecar.sh
+      - ./template_manifest.json:/scripts/template_manifest.json
