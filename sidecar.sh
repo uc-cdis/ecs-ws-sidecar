@@ -14,15 +14,28 @@ populate_notebook() {
     shift
     FOLDER=$1
     shift
-    manifest_pull="!gen3 --endpoint ${GEN3_ENDPOINT} drs-pull manifest manifest.json"
-    manifest_ls="!gen3 --endpoint ${GEN3_ENDPOINT} drs-pull ls manifest.json"
+    manifest_pull="!gen3  drs-pull manifest manifest.json"
+    manifest_ls="!gen3 drs-pull ls manifest.json"
     jq --arg cmd "$manifest_ls" '.cells[1].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
     jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
     echo  $MANIFEST | jq -c '.[]'  | while read j; do
         obj=$(echo $j | jq -r .object_id)
-        drs_pull="!gen3 --endpoint ${GEN3_ENDPOINT} drs-pull object $obj"
+        filename=$(echo $j | jq -r .file_name)
+        filesize=$(echo $j | jq -r .file_size)
+
+        # Need to add a literal newline character that's why the quote is ending on next line
+        drs_pull="!gen3 drs-pull object $obj
+
+"
+        # Need to add a literal newline character that's why the quote is ending on next line
+        jq --arg cmd "# File name: $filename - File size: $filesize
+" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
+        mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+
         jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
         mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+
+
     done
     log "Done populating notebook"
 }
@@ -38,7 +51,6 @@ function populate() {
         MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
     done
 
-    log "Populating placefolder files..."
 
     #  Loop over each exported manifest
     echo  $MANIFESTS | jq -c '.manifests[]'  | while read i; do
@@ -49,6 +61,9 @@ function populate() {
         if [ ! -d "$FOLDER" ]; then
             log "mkdir -p $FOLDER"
             mkdir -p $FOLDER
+
+            # make sure folder can be written to by notebook
+            chown -R 1000:100 $FOLDER
             MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
             echo "${MANIFEST}" > $FOLDER/manifest.json
 
@@ -57,7 +72,9 @@ function populate() {
             populate_notebook "$MANIFEST" "$FOLDER"
         fi
     done
-    log "Finished populating data"
+
+    # Make sure notebook user has write access to the folders
+    chown -R 1000:100 /data
 }
 
 function apikeyfile() {
@@ -106,8 +123,8 @@ function main() {
     log "Trying to populate data from MDS..."
     while true; do
         populate
-        log "Sleeping for 120 seconds before checking for new manifests."
-        sleep 120
+        # log "Sleeping for 30 seconds before checking for new manifests."
+        sleep 30
     done
 }
 

@@ -4,7 +4,8 @@
       "cell_type": "markdown",
       "metadata": {},
       "source": [
-        "# Explore manifest"
+        "# Explore manifest \n",
+        "This command will give you an overview of all the files from your data export."
       ]
     },
     {
@@ -18,7 +19,8 @@
       "cell_type": "markdown",
       "metadata": {},
       "source": [
-        "# Download all the files from the manifest"
+        "# Download all the files from the exported manifest. \n",
+        "This command will download all the files from your data export to this folder."
       ]
     },
     {
@@ -32,7 +34,8 @@
       "cell_type": "markdown",
       "metadata": {},
       "source": [
-        "# Download individual files from the exported manifest"
+        "# Download individual files from the exported manifest \n",
+        "These commands below can be used to download individual files from your data export."
       ]
     },
     {
