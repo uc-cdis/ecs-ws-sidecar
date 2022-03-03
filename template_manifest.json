@@ -5,7 +5,7 @@
       "metadata": {},
       "source": [
         "# Explore manifest \n",
-        "This command will give you an overview of all the files from your data export."
+        "This command will give you an overview of all the files from your data export; it will show the contents of the manifest.json."
       ]
     },
     {
