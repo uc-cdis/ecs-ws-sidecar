@@ -9,48 +9,72 @@ function log(){
 }
 
 
+populate_notebook() {
+    MANIFEST=$1
+    shift
+    FOLDER=$1
+    shift
+    manifest_pull="!gen3  drs-pull manifest manifest.json"
+    manifest_ls="!gen3 drs-pull ls manifest.json"
+    jq --arg cmd "$manifest_ls" '.cells[1].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+    jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+    echo  $MANIFEST | jq -c '.[]'  | while read j; do
+        obj=$(echo $j | jq -r .object_id)
+        filename=$(echo $j | jq -r .file_name)
+        filesize=$(echo $j | jq -r .file_size)
+
+        # Need to add a literal newline character that's why the quote is ending on next line
+        drs_pull="!gen3 drs-pull object $obj
+
+"
+        # Need to add a literal newline character that's why the quote is ending on next line
+        jq --arg cmd "# File name: $filename - File size: $filesize
+" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
+        mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+
+        jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
+        mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+
+
+    done
+    log "Done populating notebook"
+}
+
 function populate() {
     log "querying manifest service at $GEN3_ENDPOINT/manifests/"
-    MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
+    MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
     while [ -z "$MANIFESTS" ]; do
         log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
         log $MANIFESTS
         log "sleeping for 15 seconds before trying again.."
         sleep 15
-        MANIFESTS=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" 2>/dev/null | jq -c ".manifests | .[-1]")
+        MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
     done
-    FILENAME=$(echo "${MANIFESTS}" | jq -r .filename)
-    MANIFEST=$(curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME" 2>/dev/null | jq -r .)
-    echo "${MANIFEST}" > /data/manifest.json
-    log "Populating placefolder files..."
-    jq -c '.[]' /data/manifest.json | while read i; do
-        # C_URL=$( echo $i | jq -r .commons_url )
-        FILE_NAME=$( echo $i | jq -r .file_name )
-        OBJECT_ID=$( echo $i | jq -r .object_id )
-        # only care if there is an object ID
-        if [[ -n "${OBJECT_ID}" ]]; then
-            if [[ -n "${FILE_NAME}" ]]; then
-                # if file name exist, use it
-                touch "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Please run \"gen3 drs-pull object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-                echo -en "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${GEN3_ENDPOINT}/${FILE_NAME}_PLACEHOLDER.txt"
-            else
-                # otherwise, name it using object ID
-                touch "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "THIS IS JUST A PLACEHOLDER FILE TO VISUALIZE THE FILES! \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Please run \"gen3 drs-pull object ${OBJECT_ID}\" from Terminal to download this data file using Gen3 CLI. \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-                echo "Or check the tutorial notebook to learn how to download a single or multiple data files at once using Gen3 SDK \n\n" >> "/data/${GEN3_ENDPOINT}/${OBJECT_ID}_PLACEHOLDER.txt"
-            fi
-        else
-            log "No object ID found for manifest entry, skipping..."
+
+
+    #  Loop over each exported manifest
+    echo  $MANIFESTS | jq -c '.manifests[]'  | while read i; do
+        FILENAME=$(echo "${i}" | jq -r .filename)
+        FOLDERNAME=$(echo "${FILENAME%.*}")
+        FOLDER="/data/${GEN3_ENDPOINT}/exported-${FOLDERNAME}"
+
+        if [ ! -d "$FOLDER" ]; then
+            log "mkdir -p $FOLDER"
+            mkdir -p $FOLDER
+
+            # make sure folder can be written to by notebook
+            chown -R 1000:100 $FOLDER
+            MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
+            echo "${MANIFEST}" > $FOLDER/manifest.json
+
+            log "Creating notebook for $FILENAME"
+            cp ./template_manifest.json $FOLDER/data.ipynb
+            populate_notebook "$MANIFEST" "$FOLDER"
         fi
     done
-    log "Finished populating placeholder files"
-    while true; do
-        # Sleeping forever so EKS will be happy
-        sleep 10000
-    done
+
+    # Make sure notebook user has write access to the folders
+    chown -R 1000:100 /data
 }
 
 function apikeyfile() {
@@ -60,7 +84,6 @@ function apikeyfile() {
     fi
     if [[ -z $API_KEY ]]; then
         log '$API_KEY not set. Skipping writing api key to file. WARNING: Gen3 SDK will not be configured correctly.'
-        exit 5
     else
         log "Writing apiKey to ~/.gen3/credentials.json"
         apikey=$(jq --arg key0   'api_key' \
@@ -73,7 +96,14 @@ function apikeyfile() {
 
 function get_access_token() {
     log "Getting access token using mounted API key from https://$GEN3_ENDPOINT/user/"
-    export ACCESS_TOKEN=$(curl -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" 2>/dev/null | jq -r .access_token)
+    ACCESS_TOKEN=$(curl -s -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" | jq -r .access_token)
+    while [ -z "$ACCESS_TOKEN" ]; do
+        log "Unable to get ACCESS TOKEN using API key."
+        log "sleeping for 15 seconds before trying again.."
+        sleep 15
+        ACCESS_TOKEN=$(curl -s -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" | jq -r .access_token)
+    done
+    export ACCESS_TOKEN="$ACCESS_TOKEN"
 }
 
 function main() {
@@ -86,17 +116,16 @@ function main() {
     apikeyfile
     get_access_token
 
-    if [[ -z "${ACCESS_TOKEN}" ]]; then
-        log "No access token set"
-        exit 2
-    fi
-
     if [[ ! -d "/data/${GEN3_ENDPOINT}" ]]; then
         log "Creating /data/$GEN3_ENDPOINT/ directory"
         mkdir "/data/${GEN3_ENDPOINT}/"
     fi
     log "Trying to populate data from MDS..."
-    populate
+    while true; do
+        populate
+        # log "Sleeping for 30 seconds before checking for new manifests."
+        sleep 30
+    done
 }
 
 

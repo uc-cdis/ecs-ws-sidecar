@@ -1,0 +1,32 @@
+version: "3.9"
+volumes:
+  data:
+  gen3:
+services:
+  jupyter:
+    entrypoint:
+      - "start-notebook.sh"
+    command:
+      - "--NotebookApp.default_url=/lab"
+      - "--NotebookApp.password=''"
+      - "--NotebookApp.token=''"
+      - "--NotebookApp.shutdown_no_activity_timeout=5400"
+      - "--NotebookApp.quit_button=False"
+    ports:
+    - "8888:8888"
+    image: quay.io/cdis/jupyter-superslim:master
+    environment:
+      GEN3_ENDPOINT: ${GEN3_ENDPOINT}
+    volumes:
+      - data:/home/jovyan/data
+      - gen3:/home/jovyan/.gen3
+  sidecar:
+    build: .
+    environment:
+      GEN3_ENDPOINT: ${GEN3_ENDPOINT}
+      API_KEY: ${GEN3_API_KEY}
+    volumes:
+      - data:/data
+      - gen3:/.gen3
+      - ./sidecar.sh:/scripts/sidecar.sh
+      - ./template_manifest.json:/scripts/template_manifest.json

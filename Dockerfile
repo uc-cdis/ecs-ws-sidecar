@@ -8,6 +8,7 @@ RUN apk update && \
 WORKDIR /scripts
 
 COPY ./sidecar.sh sidecar.sh
+COPY ./template_manifest.json template_manifest.json
 
 RUN mkdir /data
 
