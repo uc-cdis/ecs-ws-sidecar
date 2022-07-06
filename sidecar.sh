@@ -55,22 +55,30 @@ function populate() {
     #  Loop over each exported manifest
     echo  $MANIFESTS | jq -c '.manifests[]'  | while read i; do
         FILENAME=$(echo "${i}" | jq -r .filename)
-        FOLDERNAME=$(echo "${FILENAME%.*}")
-        FOLDER="/data/${GEN3_ENDPOINT}/exported-${FOLDERNAME}"
 
-        if [ ! -d "$FOLDER" ]; then
-            log "mkdir -p $FOLDER"
-            mkdir -p $FOLDER
+        MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
+        # echo "${MANIFEST}" > temp_manifest.json
+        STUDY_NAMES=`cat temp_manifest.json | jq -c '.[] | .study_name ' | sort | uniq | jq -r`
+        log "$STUDY_NAMES"
+        for STUDY_NAME in $STUDY_NAMES; do
+            log "Study name in the loop is -- $STUDY_NAME"
+            FOLDER="/data/${GEN3_ENDPOINT}/exported_${STUDY_NAME}"
+            log "$FOLDER"
+            if [ ! -d "$FOLDER" ]; then
+                log "mkdir -p $FOLDER"
+                mkdir -p $FOLDER
 
-            # make sure folder can be written to by notebook
-            chown -R 1000:100 $FOLDER
-            MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
-            echo "${MANIFEST}" > $FOLDER/manifest.json
+                # make sure folder can be written to by notebook
+                chown -R 1000:100 $FOLDER
+                CURRENT_MANIFEST=`cat temp_manifest.json | jq --arg study_name $STUDY_NAME -c '[.[] | select( .study_name == $study_name)]' | jq`
+                echo ${CURRENT_MANIFEST} > $FOLDER/manifest.json
 
-            log "Creating notebook for $FILENAME"
-            cp ./template_manifest.json $FOLDER/data.ipynb
-            populate_notebook "$MANIFEST" "$FOLDER"
-        fi
+                log "Creating notebook for $FILENAME"
+                cp ./template_manifest.json $FOLDER/data.ipynb
+                populate_notebook "$CURRENT_MANIFEST" "$FOLDER"
+            fi
+        done
+        # rm temp_manifest.json
     done
 
     # Make sure notebook user has write access to the folders

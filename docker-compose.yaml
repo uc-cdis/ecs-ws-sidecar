@@ -30,3 +30,4 @@ services:
       - gen3:/.gen3
       - ./sidecar.sh:/scripts/sidecar.sh
       - ./template_manifest.json:/scripts/template_manifest.json
+      - ./test-manifest.json:/scripts/temp_manifest.json
