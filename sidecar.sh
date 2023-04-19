@@ -46,13 +46,8 @@ function populate() {
     while [[ -z "$MANIFESTS" ]] || [[ $(echo "$MANIFESTS" | jq '.manifests') = "null" ]]; do
         log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
         log $MANIFESTS
-        if [[ $(echo "$MANIFESTS" | jq -r '.error') = "Please log in." ]]; then
-            echo "Session Expired. Trying again with new access token"
-            get_access_token
-        else
-            echo "sleeping for 15 seconds before trying again.."
-            sleep 15
-        fi
+        echo "sleeping for 15 seconds before trying again.."
+        sleep 15
         MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
     done
 
@@ -128,8 +123,14 @@ function main() {
     log "Trying to populate data from MDS..."
     while true; do
         populate
-        # log "Sleeping for 30 seconds before checking for new manifests."
-        sleep 30
+        # If the access token expires, fetch a new access token and try again
+        if [[ $(echo "$MANIFESTS" | jq -r '.error') = "Please log in." ]]; then
+            echo "Session Expired. Trying again with new access token"
+            get_access_token
+        else
+            # log "Sleeping for 30 seconds before checking for new manifests."
+            sleep 30
+        fi
     done
 }
 
