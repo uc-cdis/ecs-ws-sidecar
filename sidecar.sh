@@ -43,7 +43,7 @@ populate_notebook() {
 function populate() {
     log "querying manifest service at $GEN3_ENDPOINT/manifests/"
     MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
-    while [[ -z "$MANIFESTS" ]] || [[ $(echo "$MANIFESTS" | jq '.manifests') = "null" ]]; do
+    while [ -z "$MANIFESTS" ]; do
         log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
         log $MANIFESTS
         echo "sleeping for 15 seconds before trying again.."
