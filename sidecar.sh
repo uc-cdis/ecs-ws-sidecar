@@ -43,11 +43,16 @@ populate_notebook() {
 function populate() {
     log "querying manifest service at $GEN3_ENDPOINT/manifests/"
     MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
-    while [ -z "$MANIFESTS" ]; do
+    while [[ -z "$MANIFESTS" ]] || [[ $(echo "$MANIFESTS" | jq '.manifests') = "null" ]]; do
         log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
         log $MANIFESTS
-        log "sleeping for 15 seconds before trying again.."
-        sleep 15
+        if [[ $(echo "$MANIFESTS" | jq -r '.error') = "Please log in." ]]; then
+            echo "Session Expired. Trying again with new access token"
+            get_access_token
+        else
+            echo "sleeping for 15 seconds before trying again.."
+            sleep 15
+        fi
         MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
     done
 
