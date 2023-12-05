@@ -18,7 +18,7 @@ populate_notebook() {
     manifest_ls="!gen3 drs-pull ls manifest.json"
     jq --arg cmd "$manifest_ls" '.cells[1].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
     jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
-    echo  $MANIFEST | jq -c '.[]'  | while read j; do
+    echo $MANIFEST | jq -c '.[]' | while read j; do
         obj=$(echo $j | jq -r .object_id)
         filename=$(echo $j | jq -r .file_name)
         filesize=$(echo $j | jq -r .file_size)
@@ -53,7 +53,7 @@ function populate() {
 
 
     #  Loop over each exported manifest
-    echo  $MANIFESTS | jq -c '.manifests[]'  | while read i; do
+    echo $MANIFESTS | jq -c '.manifests[]' | while read i; do
         FILENAME=$(echo "${i}" | jq -r .filename)
         FOLDERNAME=$(echo "${FILENAME%.*}")
         FOLDER="/data/${GEN3_ENDPOINT}/exported-${FOLDERNAME}"
@@ -106,6 +106,11 @@ function get_access_token() {
     export ACCESS_TOKEN="$ACCESS_TOKEN"
 }
 
+# _jq ${ENCODED_JSON} ${KEY} returns JSON.KEY
+_jq() {
+    (base64 -d | jq -r ${2}) <<< ${1}
+}
+
 function mount_hatchery_files() {
     log "Mounting Hatchery files"
     FOLDER="/mounted-files"
@@ -113,27 +118,16 @@ function mount_hatchery_files() {
         mkdir $FOLDER
     fi
 
-    cat - > "/mounted-files/welcome.html" <<EOM
-<!doctypehtml><html lang=en><title>Nextflow Workspace</title><link href="https://fonts.googleapis.com/icon?family=Source+Sans+Pro"rel=stylesheet><style>body{font-family:"Source Sans Pro",sans-serif;background:#f5f5f5;margin:0;padding:0 20px 20px 20px;font-size:14px;line-height:1.6em;letter-spacing:.02rem}h1.header{margin:20px 10px 16px;border-bottom:solid #421c52 2px;font-size:32px;font-weight:600;line-height:2em;letter-spacing:0;color:#000}.content{padding:10px}</style><h1 class=header>Welcome to the Nextflow Workspace</h1><div class=content><p><strong>This is your personal workspace. The "pd" folder represents your persistent drive:</strong><ul><li>The files you save here will still be available when you come back after terminating your workspace session.<li>Any personal files outside of this folder will be lost.</ul><h2 class=header>Get started with Nextflow</h2><p>If you are new to Nextflow, visit <a href=https://www.nextflow.io>nextflow.io</a> for detailed information.<p>This workspace is set up to run Nextflow workflows in AWS Batch. Your Nextflow configuration must include the Batch queue, IAM role ARN and work directory that were created for you. The configuration below will allow you to run simple workflows and can be adapted to your needs.<p><strong>nextflow.config</strong><pre>
-	plugins {
-		id 'nf-amazon'
-	}
-	process {
-		executor = 'awsbatch'
-		queue = 'QUEUE NAME'
-		container = ''
-	}
-	aws {
-		batch {
-			cliPath = '/home/ec2-user/miniconda/bin/aws'
-			jobRole = 'JOB ROLE ARN'
-		}
-	}
-	workDir = 'S3 BUCKET AND PREFIX'
-	</pre><p><strong>Run in terminal:</strong><pre>
-	nextflow run hello
-	</pre></div>
-EOM
+    echo "Fetching files to mount..."
+    DATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files")
+    # base64 and _jq allow parsing special characters in the json data, such as double quotes
+    echo $DATA | jq -c '.[] | @base64' | while read file_data; do
+        file_path=$(_jq $file_data .file_path)
+        echo "Mounting '$file_path'"
+        content=$(_jq $file_data .contents)
+        mkdir -p "$FOLDER/$(dirname "$file_path")"
+        echo $content > $FOLDER/$file_path
+    done
 }
 
 function main() {
@@ -142,16 +136,17 @@ function main() {
         exit 1
     fi
 
-    mount_hatchery_files
-
     # Gen3SDK should work if $API_KEY is set
     apikeyfile
     get_access_token
+
+    mount_hatchery_files
 
     if [[ ! -d "/data/${GEN3_ENDPOINT}" ]]; then
         log "Creating /data/$GEN3_ENDPOINT/ directory"
         mkdir "/data/${GEN3_ENDPOINT}/"
     fi
+
     log "Trying to populate data from MDS..."
     while true; do
         populate
