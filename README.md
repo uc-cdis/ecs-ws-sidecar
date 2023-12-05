@@ -2,6 +2,8 @@
 
 This containers only purpose is to query the manifestservice and present the manifests in a consumable manner.
 
+TODO update
+
 ## local testing
 
 Create a .env file with the following format
