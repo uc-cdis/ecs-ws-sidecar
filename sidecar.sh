@@ -113,7 +113,7 @@ _jq() {
 
 function mount_hatchery_files() {
     log "Mounting Hatchery files"
-    FOLDER="/mounted-files"
+    FOLDER="/data"
     if [ ! -d "$FOLDER" ]; then
         mkdir $FOLDER
     fi
