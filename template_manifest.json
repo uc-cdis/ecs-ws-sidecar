@@ -5,7 +5,7 @@
       "metadata": {},
       "source": [
         "# Explore manifest \n",
-        "This command will give you an overview of all the files from your data export."
+        "This command will give you an overview of all the files from your data export; it will show the contents of the manifest.json."
       ]
     },
     {
@@ -19,7 +19,7 @@
       "cell_type": "markdown",
       "metadata": {},
       "source": [
-        "# Download all the files from the exported manifest. \n",
+        "# Download all the files from the exported manifest \n",
         "This command will download all the files from your data export to this folder."
       ]
     },

@@ -123,8 +123,14 @@ function main() {
     log "Trying to populate data from MDS..."
     while true; do
         populate
-        # log "Sleeping for 30 seconds before checking for new manifests."
-        sleep 30
+        # If the access token expires, fetch a new access token and try again
+        if [[ $(echo "$MANIFESTS" | jq -r '.error') = "Please log in." ]]; then
+            echo "Session Expired. Trying again with new access token"
+            get_access_token
+        else
+            # log "Sleeping for 30 seconds before checking for new manifests."
+            sleep 30
+        fi
     done
 }
 
