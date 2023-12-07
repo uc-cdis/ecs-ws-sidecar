@@ -128,6 +128,9 @@ function mount_hatchery_files() {
         mkdir -p "$FOLDER/$(dirname "$file_path")"
         echo $content > $FOLDER/$file_path
     done
+
+    # Make sure notebook user has write access to the folders
+    chown -R 1000:100 /data
 }
 
 function main() {
