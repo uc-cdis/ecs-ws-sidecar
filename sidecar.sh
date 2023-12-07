@@ -106,11 +106,6 @@ function get_access_token() {
     export ACCESS_TOKEN="$ACCESS_TOKEN"
 }
 
-# _jq ${ENCODED_JSON} ${KEY} returns JSON.KEY
-_jq() {
-    (base64 -d | jq -r ${2}) <<< ${1}
-}
-
 function mount_hatchery_files() {
     log "Mounting Hatchery files"
     FOLDER="/data"
@@ -120,17 +115,14 @@ function mount_hatchery_files() {
 
     echo "Fetching files to mount..."
     DATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files")
-    # base64 and _jq allow parsing special characters in the json data, such as double quotes
-    echo $DATA | jq -c '.[] | @base64' | while read file_data; do
-        file_path=$(_jq $file_data .file_path)
+    echo $DATA | jq -c -r '.[]' | while read file_path; do
         echo "Mounting '$file_path'"
-        content=$(_jq $file_data .contents)
         mkdir -p "$FOLDER/$(dirname "$file_path")"
-        echo $content > $FOLDER/$file_path
+        curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files?id=$file_path" > $FOLDER/$file_path
     done
 
     # Make sure notebook user has write access to the folders
-    chown -R 1000:100 /data
+    chown -R 1000:100 $FOLDER
 }
 
 function main() {
