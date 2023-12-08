@@ -123,7 +123,7 @@ function mount_hatchery_files() {
         if [[ -z "${workspace_flavor}" || -z "${WORKSPACE_FLAVOR}" || $workspace_flavor == $WORKSPACE_FLAVOR ]]; then
             echo "Mounting '$file_path'"
             mkdir -p "$FOLDER/$(dirname "$file_path")"
-            curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files?id=$file_path" > $FOLDER/$file_path
+            curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files?file_path=$file_path" > $FOLDER/$file_path
         else
             echo "Not mounting '$file_path' because its workspace flavor '$workspace_flavor' does not match"
         fi
