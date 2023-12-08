@@ -114,11 +114,19 @@ function mount_hatchery_files() {
     fi
 
     echo "Fetching files to mount..."
+    echo "This workspace flavor is '$WORKSPACE_FLAVOR'"
     DATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files")
-    echo $DATA | jq -c -r '.[]' | while read file_path; do
-        echo "Mounting '$file_path'"
-        mkdir -p "$FOLDER/$(dirname "$file_path")"
-        curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files?id=$file_path" > $FOLDER/$file_path
+    echo $DATA | jq -c -r '.[]' | while read item; do
+        file_path=$(echo "${item}" | jq -r .file_path)
+        workspace_flavor=$(echo "${item}" | jq -r .workspace_flavor)
+        # mount the file if its workspace flavor is not set or if it matches the current workspace flavor
+        if [[ -z "${workspace_flavor}" || -z "${WORKSPACE_FLAVOR}" || $workspace_flavor == $WORKSPACE_FLAVOR ]]; then
+            echo "Mounting '$file_path'"
+            mkdir -p "$FOLDER/$(dirname "$file_path")"
+            curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files?id=$file_path" > $FOLDER/$file_path
+        else
+            echo "Not mounting '$file_path' because its workspace flavor '$workspace_flavor' does not match"
+        fi
     done
 
     # Make sure notebook user has write access to the folders
