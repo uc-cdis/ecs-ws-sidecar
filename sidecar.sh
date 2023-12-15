@@ -18,7 +18,7 @@ populate_notebook() {
     manifest_ls="!gen3 drs-pull ls manifest.json"
     jq --arg cmd "$manifest_ls" '.cells[1].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
     jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
-    echo  $MANIFEST | jq -c '.[]'  | while read j; do
+    echo $MANIFEST | jq -c '.[]' | while read j; do
         obj=$(echo $j | jq -r .object_id)
         filename=$(echo $j | jq -r .file_name)
         filesize=$(echo $j | jq -r .file_size)
@@ -53,7 +53,7 @@ function populate() {
 
 
     #  Loop over each exported manifest
-    echo  $MANIFESTS | jq -c '.manifests[]'  | while read i; do
+    echo $MANIFESTS | jq -c '.manifests[]' | while read i; do
         FILENAME=$(echo "${i}" | jq -r .filename)
         FOLDERNAME=$(echo "${FILENAME%.*}")
         FOLDER="/data/${GEN3_ENDPOINT}/exported-${FOLDERNAME}"
@@ -106,6 +106,33 @@ function get_access_token() {
     export ACCESS_TOKEN="$ACCESS_TOKEN"
 }
 
+function mount_hatchery_files() {
+    log "Mounting Hatchery files"
+    FOLDER="/data"
+    if [ ! -d "$FOLDER" ]; then
+        mkdir $FOLDER
+    fi
+
+    echo "Fetching files to mount..."
+    echo "This workspace flavor is '$WORKSPACE_FLAVOR'"
+    DATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files")
+    echo $DATA | jq -c -r '.[]' | while read item; do
+        file_path=$(echo "${item}" | jq -r .file_path)
+        workspace_flavor=$(echo "${item}" | jq -r .workspace_flavor)
+        # mount the file if its workspace flavor is not set or if it matches the current workspace flavor
+        if [[ -z "${workspace_flavor}" || -z "${WORKSPACE_FLAVOR}" || $workspace_flavor == $WORKSPACE_FLAVOR ]]; then
+            echo "Mounting '$file_path'"
+            mkdir -p "$FOLDER/$(dirname "$file_path")"
+            curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files?file_path=$file_path" > $FOLDER/$file_path
+        else
+            echo "Not mounting '$file_path' because its workspace flavor '$workspace_flavor' does not match"
+        fi
+    done
+
+    # Make sure notebook user has write access to the folders
+    chown -R 1000:100 $FOLDER
+}
+
 function main() {
     if [[ -z "${GEN3_ENDPOINT}" ]]; then
         log "No base url set"
@@ -116,10 +143,13 @@ function main() {
     apikeyfile
     get_access_token
 
+    mount_hatchery_files
+
     if [[ ! -d "/data/${GEN3_ENDPOINT}" ]]; then
         log "Creating /data/$GEN3_ENDPOINT/ directory"
         mkdir "/data/${GEN3_ENDPOINT}/"
     fi
+
     log "Trying to populate data from MDS..."
     while true; do
         populate
