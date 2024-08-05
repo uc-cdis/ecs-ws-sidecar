@@ -90,7 +90,6 @@ function populate() {
         fi
         done
     }
-`
     echo $MANIFESTS | jq -c '.manifests' | process_files manifests
     echo $METADATA | jq -c '.external_file_metadata' | process_files metadata
 
