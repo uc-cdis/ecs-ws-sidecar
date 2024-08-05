@@ -165,11 +165,6 @@ function main() {
         exit 1
     fi
 
-    if [[ -z "${MANIFEST_SERVICE_ENDPOINT}" ]]; then
-        log "Manifest service url not set"
-        exit 1
-    fi
-
     # Gen3SDK should work if $API_KEY is set
     apikeyfile
     get_access_token
