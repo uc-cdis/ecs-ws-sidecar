@@ -39,8 +39,8 @@ populate_notebook() {
 function populate() {
     log "querying manifest service at $GEN3_ENDPOINT/manifests/"
     MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
-    log "querying manifest service at $GEN3_ENDPOINT/metadata/"
-    METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/metadata/")
+    log "querying manifest service at $GEN3_ENDPOINT/manifests/metadata/"
+    METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/")
 
     while [ -z "$MANIFEST_FILE" ] && [ -z "$METADATA_FILE" ]; do
         if [ -z "$MANIFEST_FILE" ]; then
@@ -48,21 +48,19 @@ function populate() {
             log $MANIFEST_FILE
         fi
         if [ -z "$METADATA_FILE" ]; then
-            log "Unable to get metadata from '$GEN3_ENDPOINT/metadata/'"
+            log "Unable to get metadata from '$GEN3_ENDPOINT/manifests/metadata/'"
             log $METADATA_FILE
         fi
         log "sleeping for 15 seconds before trying again.."
         sleep 15
         MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
-        METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/metadata/")
+        METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/")
     done
     log "successfully retrieved manifests and metadata for user"
 
     process_files() {
         local base_dir=$1
-        shift
-        local data=$1
-        shift
+        local data=$2
 
         echo $data | jq -c '.[]' | while read i; do
             FILENAME=$(echo "${i}" | jq -r .filename)
