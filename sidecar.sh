@@ -74,13 +74,13 @@ function populate() {
             # make sure folder can be written to by notebook
             chown -R 1000:100 $FOLDER
 
-            if ["$base_dir" = "manifests"];then
+            if [[ "$base_dir" == "manifests"]]; then
                 MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
                 echo "${MANIFEST_FILE}" > $FOLDER/manifest.json
                 log "Creating notebook for $FILENAME"
                 cp ./template_manifest.json $FOLDER/data.ipynb
                 populate_notebook "$MANIFEST_FILE" "$FOLDER"
-            elif ["$base_dir" = "metadata"];then
+            elif [["$base_dir" = "metadata"]]; then
                 METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/$FILENAME")
                 echo "${METADATA_FILE}" > $FOLDER/metadata.json
             fi
@@ -88,9 +88,13 @@ function populate() {
         done
     }
     # echo $MANIFEST_FILE | jq -c '.manifests' | process_files manifests
-    process_files "manifests" "$(echo $MANIFEST_FILE | jq -c '.manifests')"
+    if [ ! -z "$MANIFEST_FILE" ]; then
+        process_files "manifests" "$(echo $MANIFEST_FILE | jq -c '.manifests')"
+    fi
+    if [ ! -z "$METADATA_FILE" ]; then
     # echo $METADATA_FILE | jq -c '.external_file_metadata' | process_files metadata
-    process_files "metadata" "$(echo $METADATA_FILE | jq -c '.external_file_metadata')"
+        process_files "metadata" "$(echo $METADATA_FILE | jq -c '.external_file_metadata')"
+    fi
 
     # Make sure notebook user has write access to the folders
     chown -R 1000:100 /data
