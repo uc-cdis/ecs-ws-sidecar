@@ -90,14 +90,12 @@ function populate() {
     # echo $MANIFEST_FILE | jq -c '.manifests' | process_files manifests
     if [ ! -z "$MANIFEST_FILE" ]; then
         log "process manifest files"
-        MANIFEST_CONTENT=$(echo $MANIFEST_FILE | jq -c '.manifests')
-        process_files "manifests" "$MANIFEST_CONTENT"
+        process_files "manifests" "$(echo $MANIFEST_FILE | jq -c '.manifests')"
     fi
     if [ ! -z "$METADATA_FILE" ]; then
     # echo $METADATA_FILE | jq -c '.external_file_metadata' | process_files metadata
         log "process metadata files"
-        METADATA_CONTENT=$(echo $METADATA_FILE | jq -c '.external_file_metadata')
-        process_files "metadata" "$METADATA_CONTENT"
+        process_files "metadata" "$(echo $METADATA_FILE | jq -c '.external_file_metadata')"
     fi
 
     # Make sure notebook user has write access to the folders
