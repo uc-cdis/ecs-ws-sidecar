@@ -41,23 +41,23 @@ populate_notebook() {
 
 function populate() {
     log "querying manifest service at $GEN3_ENDPOINT/manifests/"
-    MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
+    MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
     log "querying manifest service at $GEN3_ENDPOINT/metadata/"
-    METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/metadata/")
+    METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/metadata/")
 
-    while [ -z "$MANIFEST_FILE" ] && [ -z "$METADATA_FILE" ]; do
-        if [ -z "$MANIFEST_FILE" ]; then
+    while [ -z "$MANIFEST" ] && [ -z "$METADATA_FILE" ]; do
+        if [ -z "$MANIFESTE" ]; then
             log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
-            log $MANIFEST_FILE
+            log $MANIFEST
         fi
         if [ -z "$METADATA_FILE" ]; then
             log "Unable to get metadata from '$GEN3_ENDPOINT/metadata/'"
-            log $METADATA_FILE
+            log $METADATA
         fi
         log "sleeping for 15 seconds before trying again.."
         sleep 15
-        MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
-        METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/metadata/")
+        MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
+        METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/metadata/")
     done
     log "successfully retrieved manifests and metadata for user"
 
