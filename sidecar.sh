@@ -60,40 +60,44 @@ function populate() {
 
     process_files() {
         local base_dir=$1
-        local data=$2
+        shift
+        local data=$1
+        shift
 
         echo $data | jq -c '.[]' | while read i; do
-        FILENAME=$(echo "${i}" | jq -r .filename)
-        FOLDERNAME=$(echo "${FILENAME%.*}")
-        FOLDER="/data/${GEN3_ENDPOINT}/exported-${base_dir}/exported-${FOLDERNAME}"
+            FILENAME=$(echo "${i}" | jq -r .filename)
+            FOLDERNAME=$(echo "${FILENAME%.*}")
+            FOLDER="/data/${GEN3_ENDPOINT}/exported-${base_dir}/exported-${FOLDERNAME}"
 
-        if [ ! -d "$FOLDER" ]; then
-            log "mkdir -p $FOLDER"
-            mkdir -p $FOLDER
+            if [ ! -d "$FOLDER" ]; then
+                log "mkdir -p $FOLDER"
+                mkdir -p $FOLDER
 
-            # make sure folder can be written to by notebook
-            chown -R 1000:100 $FOLDER
+                # make sure folder can be written to by notebook
+                chown -R 1000:100 $FOLDER
 
-            if [[ "$base_dir" == "manifests" ]]; then
-                MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
-                echo "${MANIFEST_FILE}" > $FOLDER/manifest.json
-                log "Creating notebook for $FILENAME"
-                cp ./template_manifest.json $FOLDER/data.ipynb
-                populate_notebook "$MANIFEST_FILE" "$FOLDER"
-            elif [[ "$base_dir" == "metadata" ]]; then
-                METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/$FILENAME")
-                echo "${METADATA_FILE}" > $FOLDER/metadata.json
+                if [[ "$base_dir" == "manifests" ]]; then
+                    MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
+                    echo "${MANIFEST_FILE}" > $FOLDER/manifest.json
+                    log "Creating notebook for $FILENAME"
+                    cp ./template_manifest.json $FOLDER/data.ipynb
+                    populate_notebook "$MANIFEST_FILE" "$FOLDER"
+                elif [[ "$base_dir" == "metadata" ]]; then
+                    METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/$FILENAME")
+                    echo "${METADATA_FILE}" > $FOLDER/metadata.json
+                fi
             fi
-        fi
         done
     }
     # echo $MANIFEST_FILE | jq -c '.manifests' | process_files manifests
     if [ ! -z "$MANIFEST_FILE" ]; then
-        process_files "manifests" "$(echo $MANIFEST_FILE | jq -c '.manifests')"
+        MANIFEST_CONTENT=$(echo $MANIFEST_FILE | jq -c '.manifests')
+        process_files "manifests" "$MANIFEST_CONTENT"
     fi
     if [ ! -z "$METADATA_FILE" ]; then
     # echo $METADATA_FILE | jq -c '.external_file_metadata' | process_files metadata
-        process_files "metadata" "$(echo $METADATA_FILE | jq -c '.external_file_metadata')"
+        METADATA_CONTENT=$(echo $METADATA_FILE | jq -c '.external_file_metadata')
+        process_files "metadata" "$METADATA_CONTENT"
     fi
 
     # Make sure notebook user has write access to the folders
