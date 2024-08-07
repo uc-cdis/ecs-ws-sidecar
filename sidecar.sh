@@ -23,12 +23,9 @@ populate_notebook() {
         filesize=$(echo $j | jq -r .file_size)
 
         # Need to add a literal newline character that's why the quote is ending on next line
-        drs_pull="!gen3 drs-pull object $obj
-
-"
+        drs_pull="!gen3 drs-pull object $obj"
         # Need to add a literal newline character that's why the quote is ending on next line
-        jq --arg cmd "# File name: $filename - File size: $filesize
-" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
+        jq --arg cmd "# File name: $filename - File size: $filesize" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
         mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
 
         jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
@@ -77,13 +74,13 @@ function populate() {
             # make sure folder can be written to by notebook
             chown -R 1000:100 $FOLDER
 
-            if ["$base_dir" == "manifests"];then
+            if ["$base_dir" = "manifests"];then
                 MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
                 echo "${MANIFEST_FILE}" > $FOLDER/manifest.json
                 log "Creating notebook for $FILENAME"
                 cp ./template_manifest.json $FOLDER/data.ipynb
                 populate_notebook "$MANIFEST_FILE" "$FOLDER"
-            elif ["$base_dir" == "metadata"];then
+            elif ["$base_dir" = "metadata"];then
                 METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/$FILENAME")
                 echo "${METADATA_FILE}" > $FOLDER/metadata.json
             fi
