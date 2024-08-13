@@ -46,7 +46,7 @@ function populate() {
     METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata")
 
     while [ -z "$MANIFEST" ] && [ -z "$METADATA_FILE" ]; do
-        if [ -z "$MANIFESTE" ]; then
+        if [ -z "$MANIFEST" ]; then
             log "Unable to get manifests from '$GEN3_ENDPOINT/manifests'"
             log $MANIFEST
         fi
@@ -181,7 +181,7 @@ function main() {
     while true; do
         populate
         # If the access token expires, fetch a new access token and try again
-        if [[ $(echo "$MANIFEST_FILE" | jq -r '.error') = "Please log in." ]]; then
+        if [[ $(echo "$MANIFEST" | jq -r '.error') = "Please log in." ]]; then
             echo "Session Expired. Trying again with new access token"
             get_access_token
         else
