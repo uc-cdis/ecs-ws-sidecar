@@ -90,11 +90,9 @@ function populate() {
             fi
         done
     }
-    # echo $MANIFEST_FILE | jq -c '.manifests' | process_files manifests
     if [ -n "$MANIFEST_FILE" ]; then
         process_files "manifests" "$(echo $MANIFEST_FILE | jq -c '.manifests')"
     fi
-    # echo $METADATA_FILE | jq -c '.external_file_metadata' | process_files metadata
     if [ -n "$METADATA_FILE" ]; then
         process_files "metadata" "$(echo $METADATA_FILE | jq -c '.external_file_metadata')"
     fi
