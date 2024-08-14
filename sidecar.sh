@@ -8,9 +8,8 @@ function log(){
     echo "${TIMESTAMP}: $1" >> ${LOGFILE}
 }
 
-
 populate_notebook() {
-    MANIFEST=$1
+    MANIFEST_FILE=$1
     shift
     FOLDER=$1
     shift
@@ -18,7 +17,7 @@ populate_notebook() {
     manifest_ls="!gen3 drs-pull ls manifest.json"
     jq --arg cmd "$manifest_ls" '.cells[1].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
     jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
-    echo $MANIFEST | jq -c '.[]' | while read j; do
+    echo $MANIFEST_FILE | jq -c '.[]' | while read j; do
         obj=$(echo $j | jq -r .object_id)
         filename=$(echo $j | jq -r .file_name)
         filesize=$(echo $j | jq -r .file_size)
@@ -41,37 +40,62 @@ populate_notebook() {
 }
 
 function populate() {
-    log "querying manifest service at $GEN3_ENDPOINT/manifests/"
-    MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
-    while [ -z "$MANIFESTS" ]; do
-        log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
-        log $MANIFESTS
+    log "querying manifest service at $GEN3_ENDPOINT/manifests"
+    MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests")
+    log "querying manifest service at $GEN3_ENDPOINT/metadata"
+    METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata")
+
+    while [ -z "$MANIFEST" ] && [ -z "$METADATA_FILE" ]; do
+        if [ -z "$MANIFEST" ]; then
+            log "Unable to get manifests from '$GEN3_ENDPOINT/manifests'"
+            log $MANIFEST
+        fi
+        if [ -z "$METADATA_FILE" ]; then
+            log "Unable to get metadata from '$GEN3_ENDPOINT/manifests/metadata'"
+            log $METADATA
+        fi
         log "sleeping for 15 seconds before trying again.."
         sleep 15
-        MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
+        MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests")
+        METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata")
     done
+    log "successfully retrieved manifests and metadata for user"
 
+    process_files() {
+        local base_dir=$1
+        local data=$2
 
-    #  Loop over each exported manifest
-    echo $MANIFESTS | jq -c '.manifests[]' | while read i; do
-        FILENAME=$(echo "${i}" | jq -r .filename)
-        FOLDERNAME=$(echo "${FILENAME%.*}")
-        FOLDER="/data/${GEN3_ENDPOINT}/exported-${FOLDERNAME}"
+        echo $data | jq -c '.[]' | while read i; do
+            FILENAME=$(echo "${i}" | jq -r .filename)
+            FOLDERNAME=$(echo "${FILENAME%.*}")
+            FOLDER="/data/${GEN3_ENDPOINT}/exported-${base_dir}/exported-${FOLDERNAME}"
 
-        if [ ! -d "$FOLDER" ]; then
-            log "mkdir -p $FOLDER"
-            mkdir -p $FOLDER
+            if [ ! -d "$FOLDER" ]; then
+                log "mkdir -p $FOLDER"
+                mkdir -p $FOLDER
 
-            # make sure folder can be written to by notebook
-            chown -R 1000:100 $FOLDER
-            MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
-            echo "${MANIFEST}" > $FOLDER/manifest.json
+                # make sure folder can be written to by notebook
+                chown -R 1000:100 $FOLDER
 
-            log "Creating notebook for $FILENAME"
-            cp ./template_manifest.json $FOLDER/data.ipynb
-            populate_notebook "$MANIFEST" "$FOLDER"
-        fi
-    done
+                if [["$base_dir" == "manifests"]];then
+                    MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
+                    echo "${MANIFEST_FILE}" > $FOLDER/manifest.json
+                    log "Creating notebook for $FILENAME"
+                    cp ./template_manifest.json $FOLDER/data.ipynb
+                    populate_notebook "$MANIFEST_FILE" "$FOLDER"
+                elif [["$base_dir" == "metadata"]];then
+                    METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/$FILENAME")
+                    echo "${METADATA_FILE}" > $FOLDER/metadata.json
+                fi
+            fi
+        done
+    }
+    if [ -n "$MANIFEST_FILE" ]; then
+        process_files "manifests" "$(echo $MANIFEST_FILE | jq -c '.manifests')"
+    fi
+    if [ -n "$METADATA_FILE" ]; then
+        process_files "metadata" "$(echo $METADATA_FILE | jq -c '.external_file_metadata')"
+    fi
 
     # Make sure notebook user has write access to the folders
     chown -R 1000:100 /data
@@ -105,6 +129,7 @@ function get_access_token() {
     done
     export ACCESS_TOKEN="$ACCESS_TOKEN"
 }
+
 
 function mount_hatchery_files() {
     log "Mounting Hatchery files"
@@ -154,7 +179,7 @@ function main() {
     while true; do
         populate
         # If the access token expires, fetch a new access token and try again
-        if [[ $(echo "$MANIFESTS" | jq -r '.error') = "Please log in." ]]; then
+        if [[ $(echo "$MANIFEST" | jq -r '.error') = "Please log in." ]]; then
             echo "Session Expired. Trying again with new access token"
             get_access_token
         else
