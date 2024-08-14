@@ -36,23 +36,23 @@ populate_notebook() {
 }
 
 function populate() {
-    log "querying manifest service at $GEN3_ENDPOINT/manifests/"
-    MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests")
+    log "querying manifest service at $GEN3_ENDPOINT/manifests"
+    MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
     log "querying manifest service at $GEN3_ENDPOINT/metadata"
     METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata")
 
-    while [ -z "$MANIFEST" ] && [ -z "$METADATA_FILE" ]; do
-        if [ -z "$MANIFEST" ]; then
-            log "Unable to get manifests from '$GEN3_ENDPOINT/manifests'"
-            log $MANIFEST
+    while [ -z "$MANIFESTS" ] && [ -z "$METADATA" ]; do
+        if [ -z "$MANIFESTS" ]; then
+            log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
+            log $MANIFESTS
         fi
-        if [ -z "$METADATA_FILE" ]; then
+        if [ -z "$METADATA" ]; then
             log "Unable to get metadata from '$GEN3_ENDPOINT/manifests/metadata'"
             log $METADATA
         fi
         log "sleeping for 15 seconds before trying again.."
         sleep 15
-        MANIFEST=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests")
+        MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
         METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata")
     done
     log "successfully retrieved manifests and metadata for user"
@@ -86,11 +86,12 @@ function populate() {
             fi
         done
     }
-    if [ -n "$MANIFEST_FILE" ]; then
-        process_files "manifests" "$(echo $MANIFEST_FILE | jq -c '.manifests')"
+
+    if [ -n "$MANIFESTS" ]; then
+        process_files "manifests" "$(echo $MANIFESTS | jq -c '.manifests')"
     fi
-    if [ -n "$METADATA_FILE" ]; then
-        process_files "metadata" "$(echo $METADATA_FILE | jq -c '.external_file_metadata')"
+    if [ -n "$METADATA" ]; then
+        process_files "metadata" "$(echo $METADATA | jq -c '.external_file_metadata')"
     fi
 
     # Make sure notebook user has write access to the folders
@@ -171,11 +172,11 @@ function main() {
         mkdir "/data/${GEN3_ENDPOINT}/"
     fi
 
-    log "Trying to populate data from MDS..."
+    log "Trying to populate data from Manifest Service..."
     while true; do
         populate
         # If the access token expires, fetch a new access token and try again
-        if [[ $(echo "$MANIFEST" | jq -r '.error') = "Please log in." ]]; then
+        if [[ $(echo "$MANIFESTS" | jq -r '.error') = "Please log in." ]]; then
             echo "Session Expired. Trying again with new access token"
             get_access_token
         else
