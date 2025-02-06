@@ -1,4 +1,4 @@
-FROM quay.io/cdis/alpine:3.14
+FROM quay.io/cdis/alpine:3.21.2
 
 USER root
 
