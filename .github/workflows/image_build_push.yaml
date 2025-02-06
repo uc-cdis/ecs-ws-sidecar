@@ -5,7 +5,7 @@ on: push
 jobs:
   image_build_push:
     name: Build Image and Push
-    uses: uc-cdis/.github/.github/workflows/image_build_push_native.yaml@feat/native-arm
+    uses: uc-cdis/.github/.github/workflows/image_build_push_native.yaml@master
     secrets:
       ECR_AWS_ACCESS_KEY_ID: ${{ secrets.ECR_AWS_ACCESS_KEY_ID }}
       ECR_AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_AWS_SECRET_ACCESS_KEY }}
