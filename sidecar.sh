@@ -130,6 +130,10 @@ function get_access_token() {
 
 function mount_hatchery_files() {
     log "Mounting Hatchery files"
+    if [[ $WORKSPACE_FLAVOR == "gen3-licensed" ]]; then
+        echo "No file mounting for 'gen3-licensed' workspace"
+        return
+    fi
     FOLDER="/data"
     if [ ! -d "$FOLDER" ]; then
         mkdir $FOLDER
