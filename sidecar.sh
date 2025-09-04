@@ -71,7 +71,7 @@ function populate() {
                 mkdir -p $FOLDER
 
                 # make sure folder can be written to by notebook
-                chown -R 1000:100 $FOLDER
+                chown -R 1010:100 $FOLDER
 
                 if [[ "$base_dir" == "manifests" ]]; then
                     MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
@@ -95,7 +95,7 @@ function populate() {
     fi
 
     # Make sure notebook user has write access to the folders
-    chown -R 1000:100 /data
+    chown -R 1010:100 /data
 }
 
 function apikeyfile() {
@@ -152,7 +152,7 @@ function mount_hatchery_files() {
     done
 
     # Make sure notebook user has write access to the folders
-    chown -R 1000:100 $FOLDER
+    chown -R 1010:100 $FOLDER
 }
 
 function main() {
