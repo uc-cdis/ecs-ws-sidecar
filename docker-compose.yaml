@@ -10,6 +10,9 @@ services:
       - "--NotebookApp.default_url=/lab"
       - "--NotebookApp.password=''"
       - "--NotebookApp.token=''"
+      # - "--ServerApp.default_url=/lab"
+      # - "--ServerApp.shutdown_no_activity_timeout=5400"
+      # - "--ServerApp.quit_button=False"
       - "--NotebookApp.shutdown_no_activity_timeout=5400"
       - "--NotebookApp.quit_button=False"
     ports:
@@ -17,6 +20,7 @@ services:
     image: quay.io/cdis/jupyter-superslim:master
     environment:
       GEN3_ENDPOINT: ${GEN3_ENDPOINT}
+      JUPYTER_ENABLE_LAB: true
     volumes:
       - data:/home/jovyan/data
       - gen3:/home/jovyan/.gen3
