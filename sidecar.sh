@@ -1,190 +1,230 @@
-function log(){
-    LOGFILE="/data/populate_log.txt"
-    if [[ ! -f ${LOGFILE} ]]; then
-        touch ${LOGFILE}
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# ===== Globals =====
+LOGFILE="/data/populate_log.txt"
+RUNNING=1
+
+log() {
+  local ts
+  ts="$(date "+%Y-%m-%d %H:%M:%S")"
+  echo "${ts}: $*" | tee -a "$LOGFILE"
+}
+
+# Kill children, flip RUNNING, and exit immediately
+shutdown() {
+  RUNNING=0
+  log "Shutdown requested; terminating child processes…"
+  # Kill all children of this script
+  pkill -P $$ || true
+  # Give them a brief moment to exit gracefully
+  wait || true
+  log "Exited."
+  exit 0
+}
+
+trap shutdown TERM INT HUP QUIT
+
+# Curl defaults (fast-fail, timeouts)
+_curl() {
+  # -f: fail on HTTP errors; --connect-timeout & --max-time to avoid hangs
+  curl -sfS --retry 0 --connect-timeout 5 --max-time 15 "$@"
+}
+
+# Validate JSON; if invalid, treat as empty string
+json_or_empty() {
+  local input="$1"
+  if jq -e . >/dev/null 2>&1 <<<"$input"; then
+    printf '%s' "$input"
+  else
+    printf ''
+  fi
+}
+
+apikeyfile() {
+  if [[ ! -d "/.gen3" ]]; then
+    log "Please mount shared docker volume under /.gen3. Gen3 SDK may not be configured correctly; creating directory."
+    mkdir -p /.gen3
+  fi
+  if [[ -z "${API_KEY:-}" ]]; then
+    log "\$API_KEY not set. Skipping writing api key to file. WARNING: Gen3 SDK will not be configured correctly."
+  else
+    log "Writing apiKey to /.gen3/credentials.json"
+    jq -n --arg api_key "${API_KEY}" '{api_key:$api_key}' > /.gen3/credentials.json
+  fi
+}
+
+get_access_token() {
+  log "Getting access token from https://$GEN3_ENDPOINT/user/"
+  local tries=0
+  while (( tries < 10 )) && (( RUNNING )); do
+    ACCESS_TOKEN="$(_curl -H "Content-Type: application/json" \
+      -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" \
+      -d "{\"api_key\":\"${API_KEY:-}\"}" | jq -r .access_token || true)"
+    if [[ -n "${ACCESS_TOKEN:-}" && "${ACCESS_TOKEN}" != "null" ]]; then
+      export ACCESS_TOKEN
+      log "Access token acquired."
+      return 0
     fi
-    TIMESTAMP=`date "+%Y-%m-%d %H:%M:%S"`
-    echo "${TIMESTAMP}: $1"
-    echo "${TIMESTAMP}: $1" >> ${LOGFILE}
+    ((tries++))
+    log "Unable to get ACCESS TOKEN (attempt ${tries}); retrying in 5s…"
+    sleep 5 & wait $!
+  done
+  log "Failed to obtain ACCESS TOKEN."
+  exit 1
+}
+
+mount_hatchery_files() {
+  log "Mounting Hatchery files"
+  local FOLDER="/data"
+  mkdir -p "$FOLDER"
+
+  log "Fetching files to mount… (workspace flavor: '${WORKSPACE_FLAVOR:-}')"
+  local DATA
+  DATA="$(_curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files" || true)"
+  DATA="$(json_or_empty "${DATA:-}")"
+  [[ -z "$DATA" ]] && { log "No mount-files response."; return 0; }
+
+  # Use process substitution to avoid subshell so traps work
+  while IFS= read -r item; do
+    [[ -z "${item:-}" ]] && continue
+    file_path=$(jq -r .file_path <<<"$item")
+    workspace_flavor=$(jq -r .workspace_flavor <<<"$item")
+    if [[ -z "${workspace_flavor}" || -z "${WORKSPACE_FLAVOR:-}" || "${workspace_flavor}" == "${WORKSPACE_FLAVOR:-}" ]]; then
+      log "Mounting '$file_path'"
+      mkdir -p "$FOLDER/$(dirname "$file_path")"
+      _curl -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+        "https://$GEN3_ENDPOINT/lw-workspace/mount-files?file_path=$file_path" > "$FOLDER/$file_path" || log "Failed mounting '$file_path'"
+    else
+      log "Skipping '$file_path' (workspace flavor '$workspace_flavor' does not match)"
+    fi
+  done < <(jq -c -r '.[]' <<<"$DATA")
+
+  chown -R 1000:100 "$FOLDER"
 }
 
 populate_notebook() {
-    MANIFEST_FILE=$1
-    shift
-    FOLDER=$1
-    shift
-    manifest_pull="!gen3  drs-pull manifest manifest.json"
-    manifest_ls="!gen3 drs-pull ls manifest.json"
-    jq --arg cmd "$manifest_ls" '.cells[1].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
-    jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
-    echo $MANIFEST_FILE | jq -c '.[]' | while read j; do
-        obj=$(echo $j | jq -r .object_id)
-        filename=$(echo $j | jq -r .file_name)
-        filesize=$(echo $j | jq -r .file_size)
+  local MANIFEST_JSON="$1"
+  local FOLDER="$2"
 
-        # Need to add a literal newline character that's why the quote is ending on next line
-        drs_pull="!gen3 drs-pull object $obj"
-        # Need to add a literal newline character that's why the quote is ending on next line
-        jq --arg cmd "# File name: $filename - File size: $filesize" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
-        mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+  local manifest_pull="!gen3  drs-pull manifest manifest.json"
+  local manifest_ls="!gen3 drs-pull ls manifest.json"
 
-        jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
-        mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+  jq --arg cmd "$manifest_ls"  '.cells[1].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+  jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
 
-    done
-    log "Done populating notebook"
+  while IFS= read -r j; do
+    [[ -z "$j" ]] && continue
+    obj=$(jq -r .object_id <<<"$j")
+    filename=$(jq -r .file_name  <<<"$j")
+    filesize=$(jq -r .file_size  <<<"$j")
+    local drs_pull="!gen3 drs-pull object $obj"
+
+    jq --arg cmd "# File name: $filename - File size: $filesize" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+    jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+  done < <(jq -c '.[]' <<<"$MANIFEST_JSON")
+
+  log "Done populating notebook"
 }
 
-function populate() {
-    log "querying manifest service at $GEN3_ENDPOINT/manifests"
-    MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
-    log "querying manifest service at $GEN3_ENDPOINT/metadata"
-    METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata")
+process_files() {
+  local base_dir="$1"
+  local data_json="$2"
 
-    while [ -z "$MANIFESTS" ] && [ -z "$METADATA" ]; do
-        if [ -z "$MANIFESTS" ]; then
-            log "Unable to get manifests from '$GEN3_ENDPOINT/manifests/'"
-            log $MANIFESTS
-        fi
-        if [ -z "$METADATA" ]; then
-            log "Unable to get metadata from '$GEN3_ENDPOINT/manifests/metadata'"
-            log $METADATA
-        fi
-        log "sleeping for 15 seconds before trying again.."
-        sleep 15
-        MANIFESTS=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/")
-        METADATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata")
-    done
-    log "successfully retrieved manifests and metadata for user"
+  while IFS= read -r i; do
+    [[ -z "$i" ]] && continue
+    FILENAME=$(jq -r .filename <<<"$i")
+    FOLDERNAME="${FILENAME%.*}"
+    FOLDER="/data/${GEN3_ENDPOINT}/exported-${base_dir}/exported-${FOLDERNAME}"
 
-    process_files() {
-        local base_dir=$1
-        local data=$2
+    if [[ ! -d "$FOLDER" ]]; then
+      log "mkdir -p $FOLDER"
+      mkdir -p "$FOLDER"
+      chown -R 1000:100 "$FOLDER"
 
-        echo $data | jq -c '.[]' | while read i; do
-            FILENAME=$(echo "${i}" | jq -r .filename)
-            FOLDERNAME=$(echo "${FILENAME%.*}")
-            FOLDER="/data/${GEN3_ENDPOINT}/exported-${base_dir}/exported-${FOLDERNAME}"
-
-            if [ ! -d "$FOLDER" ]; then
-                log "mkdir -p $FOLDER"
-                mkdir -p $FOLDER
-
-                # make sure folder can be written to by notebook
-                chown -R 1000:100 $FOLDER
-
-                if [[ "$base_dir" == "manifests" ]]; then
-                    MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
-                    echo "${MANIFEST_FILE}" > $FOLDER/manifest.json
-                    log "Creating notebook for $FILENAME"
-                    cp ./template_manifest.json $FOLDER/data.ipynb
-                    populate_notebook "$MANIFEST_FILE" "$FOLDER"
-                elif [[ "$base_dir" == "metadata" ]]; then
-                    METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/$FILENAME")
-                    echo "${METADATA_FILE}" > $FOLDER/metadata.json
-                fi
-            fi
-        done
-    }
-
-    if [ -n "$MANIFESTS" ]; then
-        process_files "manifests" "$(echo $MANIFESTS | jq -c '.manifests')"
+      if [[ "$base_dir" == "manifests" ]]; then
+        MANIFEST_FILE="$(_curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME" || true)"
+        MANIFEST_FILE="$(json_or_empty "${MANIFEST_FILE:-}")"
+        [[ -z "$MANIFEST_FILE" ]] && { log "Empty manifest for $FILENAME"; continue; }
+        printf '%s' "$MANIFEST_FILE" > "$FOLDER/manifest.json"
+        log "Creating notebook for $FILENAME"
+        cp ./template_manifest.json "$FOLDER/data.ipynb"
+        populate_notebook "$MANIFEST_FILE" "$FOLDER"
+      elif [[ "$base_dir" == "metadata" ]]; then
+        METADATA_FILE="$(_curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/$FILENAME" || true)"
+        METADATA_FILE="$(json_or_empty "${METADATA_FILE:-}")"
+        [[ -z "$METADATA_FILE" ]] && { log "Empty metadata for $FILENAME"; continue; }
+        printf '%s' "$METADATA_FILE" > "$FOLDER/metadata.json"
+      fi
     fi
-    if [ -n "$METADATA" ]; then
-        process_files "metadata" "$(echo $METADATA | jq -c '.external_file_metadata')"
-    fi
-
-    # Make sure notebook user has write access to the folders
-    chown -R 1000:100 /data
+  done < <(jq -c '.[]' <<<"$data_json")
 }
 
-function apikeyfile() {
-    if [[ ! -d "/.gen3" ]]; then
-        log "Please mount shared docker volume under /.gen3. Gen3 SDK will not be configured correctly.."
-        mkdir /.gen3
+populate() {
+  log "querying manifest service at $GEN3_ENDPOINT/manifests and /metadata"
+  local MANIFESTS METADATA
+  local tries=0
+
+  # Retry until both endpoints are reachable or shutdown
+  while (( RUNNING )); do
+    MANIFESTS="$(_curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/" || true)"
+    METADATA="$(_curl -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata" || true)"
+    MANIFESTS="$(json_or_empty "${MANIFESTS:-}")"
+    METADATA="$(json_or_empty "${METADATA:-}")"
+
+    if [[ -n "$MANIFESTS" || -n "$METADATA" ]]; then
+      log "successfully retrieved manifests and/or metadata for user"
+      break
     fi
-    if [[ -z $API_KEY ]]; then
-        log '$API_KEY not set. Skipping writing api key to file. WARNING: Gen3 SDK will not be configured correctly.'
-    else
-        log "Writing apiKey to ~/.gen3/credentials.json"
-        apikey=$(jq --arg key0   'api_key' \
-            --arg value0 "${API_KEY}" \
-            '. | .[$key0]=$value0 '  \
-            <<<'{}')
-        echo "$apikey" > /.gen3/credentials.json
-    fi
+
+    ((tries++))
+    log "Unable to get manifests/metadata (attempt ${tries}); retrying in 15s…"
+    sleep 15 & wait $!
+  done
+  (( RUNNING )) || return 0
+
+  if [[ -n "$MANIFESTS" ]]; then
+    process_files "manifests" "$(jq -c '.manifests' <<<"$MANIFESTS")"
+  fi
+  if [[ -n "$METADATA" ]]; then
+    process_files "metadata" "$(jq -c '.external_file_metadata' <<<"$METADATA")"
+  fi
+
+  chown -R 1000:100 /data
 }
 
-function get_access_token() {
-    log "Getting access token using mounted API key from https://$GEN3_ENDPOINT/user/"
-    ACCESS_TOKEN=$(curl -s -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" | jq -r .access_token)
-    while [ -z "$ACCESS_TOKEN" ]; do
-        log "Unable to get ACCESS TOKEN using API key."
-        log "sleeping for 15 seconds before trying again.."
-        sleep 15
-        ACCESS_TOKEN=$(curl -s -H "Content-Type: application/json" -X POST "https://$GEN3_ENDPOINT/user/credentials/api/access_token/" -d "{ \"api_key\": \"${API_KEY}\" }" | jq -r .access_token)
-    done
-    export ACCESS_TOKEN="$ACCESS_TOKEN"
-}
+main() {
+  : "${GEN3_ENDPOINT:?GEN3_ENDPOINT is required}"
 
+  # Ensure log file exists early
+  mkdir -p /data
+  touch "$LOGFILE" || true
 
-function mount_hatchery_files() {
-    log "Mounting Hatchery files"
-    FOLDER="/data"
-    if [ ! -d "$FOLDER" ]; then
-        mkdir $FOLDER
+  apikeyfile
+  get_access_token
+  mount_hatchery_files
+
+  if [[ ! -d "/data/${GEN3_ENDPOINT}" ]]; then
+    log "Creating /data/$GEN3_ENDPOINT/ directory"
+    mkdir -p "/data/${GEN3_ENDPOINT}/"
+  fi
+
+  log "Starting population loop…"
+  while (( RUNNING )); do
+    populate
+    (( RUNNING )) || break
+
+    # If the access token expired, refresh and continue
+    local err="$(jq -r '.error // empty' <<<"${MANIFESTS:-}" 2>/dev/null || true)"
+    if [[ "${err:-}" == "Please log in." ]]; then
+      log "Session expired; fetching new access token…"
+      get_access_token
+      continue
     fi
 
-    echo "Fetching files to mount..."
-    echo "This workspace flavor is '$WORKSPACE_FLAVOR'"
-    DATA=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files")
-    echo $DATA | jq -c -r '.[]' | while read item; do
-        file_path=$(echo "${item}" | jq -r .file_path)
-        workspace_flavor=$(echo "${item}" | jq -r .workspace_flavor)
-        # mount the file if its workspace flavor is not set or if it matches the current workspace flavor
-        if [[ -z "${workspace_flavor}" || -z "${WORKSPACE_FLAVOR}" || $workspace_flavor == $WORKSPACE_FLAVOR ]]; then
-            echo "Mounting '$file_path'"
-            mkdir -p "$FOLDER/$(dirname "$file_path")"
-            curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/lw-workspace/mount-files?file_path=$file_path" > $FOLDER/$file_path
-        else
-            echo "Not mounting '$file_path' because its workspace flavor '$workspace_flavor' does not match"
-        fi
-    done
-
-    # Make sure notebook user has write access to the folders
-    chown -R 1000:100 $FOLDER
+    # Sleep 30s but remain interruptible by trap
+    sleep 30 & wait $!
+  done
 }
-
-function main() {
-    if [[ -z "${GEN3_ENDPOINT}" ]]; then
-        log "No base url set"
-        exit 1
-    fi
-
-    # Gen3SDK should work if $API_KEY is set
-    apikeyfile
-    get_access_token
-
-    mount_hatchery_files
-
-    if [[ ! -d "/data/${GEN3_ENDPOINT}" ]]; then
-        log "Creating /data/$GEN3_ENDPOINT/ directory"
-        mkdir "/data/${GEN3_ENDPOINT}/"
-    fi
-
-    log "Trying to populate data from Manifest Service..."
-    while true; do
-        populate
-        # If the access token expires, fetch a new access token and try again
-        if [[ $(echo "$MANIFESTS" | jq -r '.error') = "Please log in." ]]; then
-            echo "Session Expired. Trying again with new access token"
-            get_access_token
-        else
-            # log "Sleeping for 30 seconds before checking for new manifests."
-            sleep 30
-        fi
-    done
-}
-
 
 main
