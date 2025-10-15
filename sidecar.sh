@@ -1,3 +1,6 @@
+# Environments with AL2 base images should set USER_UID=1010
+export USER_UID="${USER_UID:-1000}"
+
 function log(){
     LOGFILE="/data/populate_log.txt"
     if [[ ! -f ${LOGFILE} ]]; then
@@ -71,7 +74,7 @@ function populate() {
                 mkdir -p $FOLDER
 
                 # make sure folder can be written to by notebook
-                chown -R 1000:100 $FOLDER
+                chown -R ${USER_UID}:100 $FOLDER
 
                 if [[ "$base_dir" == "manifests" ]]; then
                     MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
