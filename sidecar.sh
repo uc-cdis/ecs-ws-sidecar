@@ -98,7 +98,7 @@ function populate() {
     fi
 
     # Make sure notebook user has write access to the folders
-    chown -R 1000:100 /data
+    chown -R ${USER_UID}:100 /data
 }
 
 function apikeyfile() {
@@ -155,7 +155,7 @@ function mount_hatchery_files() {
     done
 
     # Make sure notebook user has write access to the folders
-    chown -R 1000:100 $FOLDER
+    chown -R ${USER_UID}:100 $FOLDER
 }
 
 function main() {
