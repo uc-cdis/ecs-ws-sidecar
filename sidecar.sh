@@ -26,9 +26,11 @@ populate_notebook() {
         filesize=$(echo $j | jq -r .file_size)
 
         # Need to add a literal newline character that's why the quote is ending on next line
-        drs_pull="!gen3 drs-pull object $obj"
+        drs_pull="!gen3 drs-pull object $obj
+        "
         # Need to add a literal newline character that's why the quote is ending on next line
-        jq --arg cmd "# File name: $filename - File size: $filesize" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
+        jq --arg cmd "# File name: $filename - File size: $filesize
+        " '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
         mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
 
         jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
