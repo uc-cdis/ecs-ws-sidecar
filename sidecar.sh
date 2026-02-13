@@ -18,8 +18,8 @@ populate_notebook() {
     shift
     manifest_pull="!gen3  drs-pull manifest manifest.json"
     manifest_ls="!gen3 drs-pull ls manifest.json"
-    jq --arg cmd "$manifest_ls" '.cells[1].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
-    jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp" && mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+    jq --arg cmd "$manifest_ls" '.cells[1].source |= $cmd' "$FOLDER/download_data.ipynb" > "$FOLDER/download_data.tmp" && mv "$FOLDER/download_data.tmp" "$FOLDER/download_data.ipynb"
+    jq --arg cmd "$manifest_pull" '.cells[3].source |= $cmd' "$FOLDER/download_data.ipynb" > "$FOLDER/download_data.tmp" && mv "$FOLDER/download_data.tmp" "$FOLDER/download_data.ipynb"
     echo $MANIFEST_FILE | jq -c '.[]' | while read j; do
         obj=$(echo $j | jq -r .object_id)
         filename=$(echo $j | jq -r .file_name)
@@ -30,11 +30,11 @@ populate_notebook() {
         "
         # Need to add a literal newline character that's why the quote is ending on next line
         jq --arg cmd "# File name: $filename - File size: $filesize
-        " '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
-        mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+        " '.cells[5].source += [$cmd]' "$FOLDER/download_data.ipynb" > "$FOLDER/download_data.tmp"
+        mv "$FOLDER/download_data.tmp" "$FOLDER/download_data.ipynb"
 
-        jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/data.ipynb" > "$FOLDER/data.tmp"
-        mv "$FOLDER/data.tmp" "$FOLDER/data.ipynb"
+        jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/download_data.ipynb" > "$FOLDER/download_data.tmp"
+        mv "$FOLDER/download_data.tmp" "$FOLDER/download_data.ipynb"
 
     done
     log "Done populating notebook"
@@ -82,7 +82,7 @@ function populate() {
                     MANIFEST_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/file/$FILENAME")
                     echo "${MANIFEST_FILE}" > $FOLDER/manifest.json
                     log "Creating notebook for $FILENAME"
-                    cp ./template_manifest.json $FOLDER/data.ipynb
+                    cp ./template_manifest.json $FOLDER/download_data.ipynb
                     populate_notebook "$MANIFEST_FILE" "$FOLDER"
                 elif [[ "$base_dir" == "metadata" ]]; then
                     METADATA_FILE=$(curl -s -H "Authorization: Bearer ${ACCESS_TOKEN}" "https://$GEN3_ENDPOINT/manifests/metadata/$FILENAME")
