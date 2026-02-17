@@ -27,10 +27,10 @@ populate_notebook() {
 
         # Need to add a literal newline character that's why the quote is ending on next line
         drs_pull="!gen3 drs-pull object $obj
-        "
+"
         # Need to add a literal newline character that's why the quote is ending on next line
         jq --arg cmd "# File name: $filename - File size: $filesize
-        " '.cells[5].source += [$cmd]' "$FOLDER/download_data.ipynb" > "$FOLDER/download_data.tmp"
+" '.cells[5].source += [$cmd]' "$FOLDER/download_data.ipynb" > "$FOLDER/download_data.tmp"
         mv "$FOLDER/download_data.tmp" "$FOLDER/download_data.ipynb"
 
         jq --arg cmd "$drs_pull" '.cells[5].source += [$cmd]' "$FOLDER/download_data.ipynb" > "$FOLDER/download_data.tmp"
